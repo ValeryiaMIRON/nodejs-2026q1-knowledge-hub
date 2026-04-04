@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Category } from '../common/interfaces/category.interface';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { paginate } from '../common/utils/pagination.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class CategoryService {
   constructor(private readonly db: InMemoryDbService) {}
 
-  findAll(): Category[] {
-    return this.db.categories;
+  findAll(
+    query: GetCategoriesQueryDto,
+  ): Category[] | PaginatedResponse<Category> {
+    return paginate(this.db.categories, query.page, query.limit);
   }
 
   findById(id: string): Category {

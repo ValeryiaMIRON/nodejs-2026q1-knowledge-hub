@@ -9,7 +9,8 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentService } from './comment.service';
 
@@ -20,11 +21,10 @@ export class CommentController {
 
   @Get()
   @ApiOperation({ summary: 'Get comments by articleId' })
-  @ApiQuery({ name: 'articleId', required: true, type: String })
   @ApiResponse({ status: 200, description: 'Comments list' })
   @ApiResponse({ status: 400, description: 'articleId is required' })
-  findByArticle(@Query('articleId') articleId?: string) {
-    return this.commentService.findByArticle(articleId);
+  findByArticle(@Query() query: GetCommentsQueryDto) {
+    return this.commentService.findByArticle(query);
   }
 
   @Get(':id')

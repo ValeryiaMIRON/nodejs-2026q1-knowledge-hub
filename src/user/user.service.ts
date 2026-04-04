@@ -6,8 +6,11 @@ import {
 import { randomUUID } from 'crypto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../common/interfaces/user.interface';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { paginate } from '../common/utils/pagination.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
@@ -15,8 +18,11 @@ import { UserResponseDto } from './dto/user-response.dto';
 export class UserService {
   constructor(private readonly db: InMemoryDbService) {}
 
-  findAll(): UserResponseDto[] {
-    return this.db.users.map((user) => this.toResponse(user));
+  findAll(
+    query: GetUsersQueryDto,
+  ): UserResponseDto[] | PaginatedResponse<UserResponseDto> {
+    const users = this.db.users.map((user) => this.toResponse(user));
+    return paginate(users, query.page, query.limit);
   }
 
   findById(id: string): UserResponseDto {

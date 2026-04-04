@@ -6,21 +6,28 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Comment } from '../common/interfaces/comment.interface';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { paginate } from '../common/utils/pagination.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
 
 @Injectable()
 export class CommentService {
   constructor(private readonly db: InMemoryDbService) {}
 
-  findByArticle(articleId?: string): Comment[] {
-    if (!articleId) {
+  findByArticle(
+    query: GetCommentsQueryDto,
+  ): Comment[] | PaginatedResponse<Comment> {
+    if (!query.articleId) {
       throw new BadRequestException('articleId query param is required');
     }
 
-    return this.db.comments.filter(
-      (comment) => comment.articleId === articleId,
+    const filtered = this.db.comments.filter(
+      (comment) => comment.articleId === query.articleId,
     );
+
+    return paginate(filtered, query.page, query.limit);
   }
 
   findById(id: string): Comment {

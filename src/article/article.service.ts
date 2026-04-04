@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ArticleStatus } from '../common/enums/article-status.enum';
 import { Article } from '../common/interfaces/article.interface';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { paginate } from '../common/utils/pagination.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { GetArticlesQueryDto } from './dto/get-articles-query.dto';
@@ -11,8 +13,8 @@ import { UpdateArticleDto } from './dto/update-article.dto';
 export class ArticleService {
   constructor(private readonly db: InMemoryDbService) {}
 
-  findAll(query: GetArticlesQueryDto): Article[] {
-    return this.db.articles.filter((article) => {
+  findAll(query: GetArticlesQueryDto): Article[] | PaginatedResponse<Article> {
+    const filtered = this.db.articles.filter((article) => {
       const byStatus = query.status ? article.status === query.status : true;
       const byCategoryId = query.categoryId
         ? article.categoryId === query.categoryId
@@ -21,6 +23,8 @@ export class ArticleService {
 
       return byStatus && byCategoryId && byTag;
     });
+
+    return paginate(filtered, query.page, query.limit);
   }
 
   findById(id: string): Article {
