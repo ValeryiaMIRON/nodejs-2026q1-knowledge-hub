@@ -9,30 +9,51 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentService } from './comment.service';
 
+@ApiTags('Comments')
 @Controller('comment')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get comments by articleId' })
+  @ApiQuery({ name: 'articleId', required: true, type: String })
+  @ApiResponse({ status: 200, description: 'Comments list' })
+  @ApiResponse({ status: 400, description: 'articleId is required' })
   findByArticle(@Query('articleId') articleId?: string) {
     return this.commentService.findByArticle(articleId);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get comment by id' })
+  @ApiResponse({ status: 200, description: 'Comment found' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID' })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
   findById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.commentService.findById(id);
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create comment' })
+  @ApiResponse({ status: 201, description: 'Comment created' })
+  @ApiResponse({ status: 400, description: 'Invalid body' })
+  @ApiResponse({
+    status: 422,
+    description: 'Referenced article does not exist',
+  })
   create(@Body() dto: CreateCommentDto) {
     return this.commentService.create(dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
+  @ApiOperation({ summary: 'Delete comment' })
+  @ApiResponse({ status: 204, description: 'Comment deleted' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID' })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
   remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): void {
     this.commentService.delete(id);
   }
