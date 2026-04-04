@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,7 +13,7 @@ import { sortItems } from '../common/utils/sort.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
-import { UpdatePasswordDto } from './dto/update-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
 @Injectable()
@@ -52,10 +53,25 @@ export class UserService {
     return this.toResponse(user);
   }
 
-  updatePassword(id: string, dto: UpdatePasswordDto): UserResponseDto {
+  updatePassword(id: string, dto: UpdateUserDto): UserResponseDto {
     const user = this.db.users.find((item) => item.id === id);
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (dto.role !== undefined) {
+      user.role = dto.role;
+      user.updatedAt = Date.now();
+      return this.toResponse(user);
+    }
+
+    if (
+      dto.oldPassword === undefined ||
+      dto.newPassword === undefined ||
+      dto.oldPassword.length === 0 ||
+      dto.newPassword.length === 0
+    ) {
+      throw new BadRequestException('oldPassword and newPassword are required');
     }
 
     if (user.password !== dto.oldPassword) {

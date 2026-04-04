@@ -11,6 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -38,6 +40,7 @@ export class CategoryController {
   }
 
   @Post()
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create category' })
   @ApiResponse({ status: 201, description: 'Category created' })
   @ApiResponse({ status: 400, description: 'Invalid body' })
@@ -46,6 +49,7 @@ export class CategoryController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update category' })
   @ApiResponse({ status: 200, description: 'Category updated' })
   @ApiResponse({ status: 400, description: 'Invalid UUID or body' })
@@ -58,6 +62,7 @@ export class CategoryController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete category' })
   @ApiResponse({ status: 204, description: 'Category deleted' })

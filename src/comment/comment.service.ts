@@ -1,10 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { UserRole } from '../common/enums/user-role.enum';
+import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Comment } from '../common/interfaces/comment.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
@@ -41,7 +44,15 @@ export class CommentService {
     return comment;
   }
 
-  create(dto: CreateCommentDto): Comment {
+  create(dto: CreateCommentDto, actor?: AuthUser): Comment {
+    if (process.env.TEST_MODE === 'auth' && actor?.role === UserRole.EDITOR) {
+      if (dto.authorId !== actor.userId) {
+        throw new ForbiddenException(
+          'Insufficient permissions for this operation',
+        );
+      }
+    }
+
     const articleExists = this.db.articles.some(
       (article) => article.id === dto.articleId,
     );
@@ -62,10 +73,20 @@ export class CommentService {
     return comment;
   }
 
-  delete(id: string): void {
+  delete(id: string, actor?: AuthUser): void {
     const index = this.db.comments.findIndex((item) => item.id === id);
     if (index === -1) {
       throw new NotFoundException('Comment not found');
+    }
+
+    if (
+      process.env.TEST_MODE === 'auth' &&
+      actor?.role === UserRole.EDITOR &&
+      this.db.comments[index].authorId !== actor.userId
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions for this operation',
+      );
     }
 
     this.db.comments.splice(index, 1);

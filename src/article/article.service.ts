@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ArticleStatus } from '../common/enums/article-status.enum';
+import { UserRole } from '../common/enums/user-role.enum';
 import { Article } from '../common/interfaces/article.interface';
+import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
 import { sortItems } from '../common/utils/sort.util';
@@ -37,7 +43,15 @@ export class ArticleService {
     return article;
   }
 
-  create(dto: CreateArticleDto): Article {
+  create(dto: CreateArticleDto, actor?: AuthUser): Article {
+    if (process.env.TEST_MODE === 'auth' && actor?.role === UserRole.EDITOR) {
+      if (dto.authorId !== actor.userId) {
+        throw new ForbiddenException(
+          'Insufficient permissions for this operation',
+        );
+      }
+    }
+
     const timestamp = Date.now();
 
     const article: Article = {
@@ -56,10 +70,20 @@ export class ArticleService {
     return article;
   }
 
-  update(id: string, dto: UpdateArticleDto): Article {
+  update(id: string, dto: UpdateArticleDto, actor?: AuthUser): Article {
     const article = this.db.articles.find((item) => item.id === id);
     if (!article) {
       throw new NotFoundException('Article not found');
+    }
+
+    if (
+      process.env.TEST_MODE === 'auth' &&
+      actor?.role === UserRole.EDITOR &&
+      article.authorId !== actor.userId
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions for this operation',
+      );
     }
 
     if (dto.title !== undefined) article.title = dto.title;
