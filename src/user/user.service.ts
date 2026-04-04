@@ -8,6 +8,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../common/interfaces/user.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
+import { sortItems } from '../common/utils/sort.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
@@ -22,7 +23,8 @@ export class UserService {
     query: GetUsersQueryDto,
   ): UserResponseDto[] | PaginatedResponse<UserResponseDto> {
     const users = this.db.users.map((user) => this.toResponse(user));
-    return paginate(users, query.page, query.limit);
+    const sorted = sortItems(users, query.sortBy, query.order);
+    return paginate(sorted, query.page, query.limit);
   }
 
   findById(id: string): UserResponseDto {

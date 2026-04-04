@@ -4,6 +4,7 @@ import { ArticleStatus } from '../common/enums/article-status.enum';
 import { Article } from '../common/interfaces/article.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
+import { sortItems } from '../common/utils/sort.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { GetArticlesQueryDto } from './dto/get-articles-query.dto';
@@ -24,7 +25,8 @@ export class ArticleService {
       return byStatus && byCategoryId && byTag;
     });
 
-    return paginate(filtered, query.page, query.limit);
+    const sorted = sortItems(filtered, query.sortBy, query.order);
+    return paginate(sorted, query.page, query.limit);
   }
 
   findById(id: string): Article {

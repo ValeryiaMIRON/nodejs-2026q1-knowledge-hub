@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Category } from '../common/interfaces/category.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
+import { sortItems } from '../common/utils/sort.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
@@ -15,7 +16,8 @@ export class CategoryService {
   findAll(
     query: GetCategoriesQueryDto,
   ): Category[] | PaginatedResponse<Category> {
-    return paginate(this.db.categories, query.page, query.limit);
+    const sorted = sortItems(this.db.categories, query.sortBy, query.order);
+    return paginate(sorted, query.page, query.limit);
   }
 
   findById(id: string): Category {

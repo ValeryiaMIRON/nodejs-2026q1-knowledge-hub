@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { Comment } from '../common/interfaces/comment.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
+import { sortItems } from '../common/utils/sort.util';
 import { InMemoryDbService } from '../storage/in-memory-db.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
@@ -27,7 +28,8 @@ export class CommentService {
       (comment) => comment.articleId === query.articleId,
     );
 
-    return paginate(filtered, query.page, query.limit);
+    const sorted = sortItems(filtered, query.sortBy, query.order);
+    return paginate(sorted, query.page, query.limit);
   }
 
   findById(id: string): Comment {
