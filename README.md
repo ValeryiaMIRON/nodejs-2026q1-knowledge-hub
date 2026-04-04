@@ -1,84 +1,236 @@
-# Knowledge Hub
+# Node.js 2026 Q1 Knowledge Hub API
 
-## Prerequisites
+REST API for a Knowledge Hub platform built with NestJS and TypeScript.
 
-- Git - [Download & Install Git](https://git-scm.com/downloads).
-- Node.js - [Download & Install Node.js](https://nodejs.org/en/download/) and the npm package manager.
+## Tech Stack
 
-## Downloading
+- Node.js 24.10.0 or higher
+- NestJS
+- TypeScript
+- class-validator and global ValidationPipe
+- Swagger via @nestjs/swagger
+- In-memory storage
 
-```
-git clone {repository URL}
-```
+## Requirements
 
-## Installing NPM modules
+- Node.js version 24.10.0+
+- npm
 
-```
+## Setup
+
+1. Clone repository.
+2. Install dependencies.
+
+```bash
 npm install
 ```
 
-## Running application
+3. Create local environment file from template.
 
+```bash
+cp .env.example .env
 ```
+
+4. Ensure PORT is configured (default is 4000).
+
+```dotenv
+PORT=4000
+```
+
+## Run Application
+
+Default start command:
+
+```bash
 npm start
 ```
 
-After starting the app on port (4000 as default) you can open
-in your browser OpenAPI documentation by typing http://localhost:4000/doc/.
-For more information about OpenAPI/Swagger please visit https://swagger.io/.
+Development mode:
+
+```bash
+npm run start:dev
+```
+
+Production build and run:
+
+```bash
+npm run build
+npm run start:prod
+```
+
+Base URL:
+
+```text
+http://localhost:4000
+```
+
+Swagger OpenAPI docs:
+
+```text
+http://localhost:4000/doc
+```
+
+## Environment Variables
+
+See template in [.env.example](.env.example).
+
+Main variables:
+
+- PORT
+- CRYPT_SALT
+- JWT_SECRET_KEY
+- JWT_SECRET_REFRESH_KEY
+- TOKEN_EXPIRE_TIME
+- TOKEN_REFRESH_EXPIRE_TIME
+
+## API Routes
+
+### Users
+
+- GET /user
+- GET /user/:id
+- POST /user
+- PUT /user/:id
+- DELETE /user/:id
+
+Notes:
+
+- Password is excluded from response.
+- Deleting user sets related article authorId to null.
+- Deleting user removes related comments.
+
+### Auth
+
+- POST /auth/signup
+- POST /auth/login
+- POST /auth/refresh
+
+Notes:
+
+- /auth/login returns accessToken and refreshToken.
+- /auth/refresh returns new token pair.
+
+### Articles
+
+- GET /article
+- GET /article/:id
+- POST /article
+- PUT /article/:id
+- DELETE /article/:id
+
+Supported filtering for GET /article:
+
+- status
+- categoryId
+- tag
+
+Supported sorting and pagination for list endpoints:
+
+- sortBy
+- order (asc | desc)
+- page
+- limit
+
+Example:
+
+```text
+/article?status=published&tag=nodejs
+```
+
+```text
+/article?sortBy=title&order=asc&page=1&limit=10
+```
+
+Notes:
+
+- Deleting article removes its comments.
+
+### Categories
+
+- GET /category
+- GET /category/:id
+- POST /category
+- PUT /category/:id
+- DELETE /category/:id
+
+Notes:
+
+- Deleting category sets related article categoryId to null.
+
+### Comments
+
+- GET /comment?articleId={articleId}
+- GET /comment/:id
+- POST /comment
+- DELETE /comment/:id
+
+Notes:
+
+- articleId query is required for GET /comment.
+- POST /comment returns 422 if articleId does not exist.
+
+## Validation and Error Handling
+
+- Global ValidationPipe is enabled.
+- Incoming request bodies are validated with DTO classes.
+- UUID params are validated with ParseUUIDPipe.
+
+Typical status codes:
+
+- 200 OK
+- 201 Created
+- 204 No Content
+- 400 Bad Request
+- 403 Forbidden
+- 404 Not Found
+- 422 Unprocessable Entity
+
+## Middleware
+
+Request logging middleware is enabled globally and logs method and URL for incoming requests.
 
 ## Testing
 
-After application running open new terminal and enter:
+Run all tests:
 
-To run all tests without authorization
-
-```
+```bash
 npm run test
 ```
 
-To run only one of all test suites
+Run specific suites:
 
-```
-npm run test -- <path to suite>
+```bash
+npm run test -- users.e2e.spec.ts
+npm run test -- articles.e2e.spec.ts
+npm run test -- categories.e2e.spec.ts
+npm run test -- comments.e2e.spec.ts
 ```
 
-To run all test with authorization
+Authorization-related suites:
 
-```
+```bash
 npm run test:auth
-```
-
-To run only specific test suite with authorization
-
-```
-npm run test:auth -- <path to suite>
-```
-
-To run refresh token tests
-
-```
 npm run test:refresh
-```
-
-To run RBAC (role-based access control) tests
-
-```
 npm run test:rbac
 ```
 
-### Auto-fix and format
+Auth mode note:
 
+- TEST_MODE=auth enables authorization checks in guards.
+- test:auth, test:refresh, and test:rbac scripts already set TEST_MODE=auth.
+
+Lint source files:
+
+```bash
+npx eslint "src/**/*.ts"
 ```
-npm run lint
-```
 
-```
-npm run format
-```
+## Project Structure
 
-### Debugging in VSCode
-
-Press <kbd>F5</kbd> to debug.
-
-For more information, visit: https://code.visualstudio.com/docs/editor/debugging
+- src/user
+- src/article
+- src/category
+- src/comment
+- src/common
+- src/storage
+- test
