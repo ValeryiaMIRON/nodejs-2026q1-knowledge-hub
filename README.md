@@ -39,6 +39,12 @@ PORT=4000
 
 ## Run Application
 
+Default start command:
+
+```bash
+npm start
+```
+
 Development mode:
 
 ```bash
@@ -93,6 +99,17 @@ Notes:
 - Deleting user sets related article authorId to null.
 - Deleting user removes related comments.
 
+### Auth
+
+- POST /auth/signup
+- POST /auth/login
+- POST /auth/refresh
+
+Notes:
+
+- /auth/login returns accessToken and refreshToken.
+- /auth/refresh returns new token pair.
+
 ### Articles
 
 - GET /article
@@ -107,10 +124,21 @@ Supported filtering for GET /article:
 - categoryId
 - tag
 
+Supported sorting and pagination for list endpoints:
+
+- sortBy
+- order (asc | desc)
+- page
+- limit
+
 Example:
 
 ```text
 /article?status=published&tag=nodejs
+```
+
+```text
+/article?sortBy=title&order=asc&page=1&limit=10
 ```
 
 Notes:
@@ -185,6 +213,11 @@ npm run test:auth
 npm run test:refresh
 npm run test:rbac
 ```
+
+Auth mode note:
+
+- TEST_MODE=auth enables authorization checks in guards.
+- test:auth, test:refresh, and test:rbac scripts already set TEST_MODE=auth.
 
 Lint source files:
 
