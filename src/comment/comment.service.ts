@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -11,11 +12,23 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 @Injectable()
 export class CommentService {
   constructor(private readonly db: InMemoryDbService) {}
+
+  findByArticle(articleId?: string): Comment[] {
+    if (!articleId) {
+      throw new BadRequestException('articleId query param is required');
+    }
+
+    return this.db.comments.filter(
+      (comment) => comment.articleId === articleId,
+    );
+  }
+
   findById(id: string): Comment {
     const comment = this.db.comments.find((item) => item.id === id);
     if (!comment) {
       throw new NotFoundException('Comment not found');
     }
+
     return comment;
   }
 
@@ -23,6 +36,7 @@ export class CommentService {
     const articleExists = this.db.articles.some(
       (article) => article.id === dto.articleId,
     );
+
     if (!articleExists) {
       throw new UnprocessableEntityException('Article does not exist');
     }
@@ -44,6 +58,7 @@ export class CommentService {
     if (index === -1) {
       throw new NotFoundException('Comment not found');
     }
+
     this.db.comments.splice(index, 1);
   }
 }

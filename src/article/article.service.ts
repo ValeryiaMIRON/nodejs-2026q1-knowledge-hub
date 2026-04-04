@@ -56,12 +56,12 @@ export class ArticleService {
       throw new NotFoundException('Article not found');
     }
 
-    article.title = dto.title ?? article.title;
-    article.content = dto.content ?? article.content;
-    article.status = dto.status ?? article.status;
-    article.authorId = dto.authorId ?? article.authorId;
-    article.categoryId = dto.categoryId ?? article.categoryId;
-    article.tags = dto.tags ?? article.tags;
+    if (dto.title !== undefined) article.title = dto.title;
+    if (dto.content !== undefined) article.content = dto.content;
+    if (dto.status !== undefined) article.status = dto.status;
+    if (dto.authorId !== undefined) article.authorId = dto.authorId;
+    if (dto.categoryId !== undefined) article.categoryId = dto.categoryId;
+    if (dto.tags !== undefined) article.tags = dto.tags;
     article.updatedAt = Date.now();
 
     return article;
