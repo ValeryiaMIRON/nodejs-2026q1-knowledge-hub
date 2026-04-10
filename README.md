@@ -70,6 +70,20 @@ Swagger OpenAPI docs:
 http://localhost:4000/doc
 ```
 
+## Docker Hub Image
+
+Docker Hub image:
+
+```text
+https://hub.docker.com/r/valeryiamiron/knowledge-hub
+```
+
+Pull command:
+
+```bash
+docker pull valeryiamiron/knowledge-hub:docker-foundation
+```
+
 ## Environment Variables
 
 See template in [.env.example](.env.example).
