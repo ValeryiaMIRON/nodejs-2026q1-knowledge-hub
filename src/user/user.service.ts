@@ -4,13 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { UserRole as PrismaUserRole } from '@prisma/client';
 import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../common/interfaces/user.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
 import { sortItems } from '../common/utils/sort.util';
-import { InMemoryDbService } from '../storage/in-memory-db.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,18 +17,20 @@ import { UserResponseDto } from './dto/user-response.dto';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly db: InMemoryDbService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(
+  async findAll(
     query: GetUsersQueryDto,
-  ): UserResponseDto[] | PaginatedResponse<UserResponseDto> {
-    const users = this.db.users.map((user) => this.toResponse(user));
+  ): Promise<UserResponseDto[] | PaginatedResponse<UserResponseDto>> {
+    const users = (await this.prisma.user.findMany()).map((user) =>
+      this.toResponse(user),
+    );
     const sorted = sortItems(users, query.sortBy, query.order);
     return paginate(sorted, query.page, query.limit);
   }
 
-  findById(id: string): UserResponseDto {
-    const user = this.db.users.find((item) => item.id === id);
+  async findById(id: string): Promise<UserResponseDto> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -37,32 +38,33 @@ export class UserService {
     return this.toResponse(user);
   }
 
-  create(dto: CreateUserDto): UserResponseDto {
-    const timestamp = Date.now();
-    const user: User = {
-      id: randomUUID(),
-      login: dto.login,
-      password: dto.password,
-      role: dto.role ?? UserRole.VIEWER,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    this.db.users.push(user);
+  async create(dto: CreateUserDto): Promise<UserResponseDto> {
+    const user = await this.prisma.user.create({
+      data: {
+        login: dto.login,
+        password: dto.password,
+        role: this.toPrismaRole(dto.role ?? UserRole.VIEWER),
+      },
+    });
 
     return this.toResponse(user);
   }
 
-  updatePassword(id: string, dto: UpdateUserDto): UserResponseDto {
-    const user = this.db.users.find((item) => item.id === id);
+  async updatePassword(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     if (dto.role !== undefined) {
-      user.role = dto.role;
-      user.updatedAt = Date.now();
-      return this.toResponse(user);
+      const updated = await this.prisma.user.update({
+        where: { id },
+        data: {
+          role: this.toPrismaRole(dto.role),
+        },
+      });
+
+      return this.toResponse(updated);
     }
 
     if (
@@ -78,39 +80,55 @@ export class UserService {
       throw new ForbiddenException('Old password is wrong');
     }
 
-    user.password = dto.newPassword;
-    user.updatedAt = Date.now();
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        password: dto.newPassword,
+      },
+    });
 
-    return this.toResponse(user);
+    return this.toResponse(updated);
   }
 
-  delete(id: string): void {
-    const userIndex = this.db.users.findIndex((item) => item.id === id);
-    if (userIndex === -1) {
+  async delete(id: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    this.db.users.splice(userIndex, 1);
-
-    this.db.articles.forEach((article) => {
-      if (article.authorId === id) {
-        article.authorId = null;
-        article.updatedAt = Date.now();
-      }
-    });
-
-    this.db.comments = this.db.comments.filter(
-      (comment) => comment.authorId !== id,
-    );
+    await this.prisma.$transaction([
+      this.prisma.article.updateMany({
+        where: { authorId: id },
+        data: { authorId: null },
+      }),
+      this.prisma.comment.deleteMany({
+        where: { authorId: id },
+      }),
+      this.prisma.user.delete({ where: { id } }),
+    ]);
   }
 
-  private toResponse(user: User): UserResponseDto {
+  private toResponse(user: {
+    id: string;
+    login: string;
+    role: PrismaUserRole;
+    createdAt: Date;
+    updatedAt: Date;
+  }): UserResponseDto {
     return {
       id: user.id,
       login: user.login,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      role: this.fromPrismaRole(user.role),
+      createdAt: user.createdAt.getTime(),
+      updatedAt: user.updatedAt.getTime(),
     };
+  }
+
+  private toPrismaRole(role: UserRole): PrismaUserRole {
+    return PrismaUserRole[role.toUpperCase() as keyof typeof PrismaUserRole];
+  }
+
+  private fromPrismaRole(role: PrismaUserRole): UserRole {
+    return role.toLowerCase() as UserRole;
   }
 }

@@ -5,46 +5,45 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Comment } from '../common/interfaces/comment.interface';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
 import { sortItems } from '../common/utils/sort.util';
-import { InMemoryDbService } from '../storage/in-memory-db.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly db: InMemoryDbService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  findByArticle(
+  async findByArticle(
     query: GetCommentsQueryDto,
-  ): Comment[] | PaginatedResponse<Comment> {
+  ): Promise<Comment[] | PaginatedResponse<Comment>> {
     if (!query.articleId) {
       throw new BadRequestException('articleId query param is required');
     }
 
-    const filtered = this.db.comments.filter(
-      (comment) => comment.articleId === query.articleId,
-    );
+    const filtered = (await this.prisma.comment.findMany({
+      where: { articleId: query.articleId },
+    })).map((comment) => this.toResponse(comment));
 
     const sorted = sortItems(filtered, query.sortBy, query.order);
     return paginate(sorted, query.page, query.limit);
   }
 
-  findById(id: string): Comment {
-    const comment = this.db.comments.find((item) => item.id === id);
+  async findById(id: string): Promise<Comment> {
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
     if (!comment) {
       throw new NotFoundException('Comment not found');
     }
 
-    return comment;
+    return this.toResponse(comment);
   }
 
-  create(dto: CreateCommentDto, actor?: AuthUser): Comment {
+  async create(dto: CreateCommentDto, actor?: AuthUser): Promise<Comment> {
     if (process.env.TEST_MODE === 'auth' && actor?.role === UserRole.EDITOR) {
       if (dto.authorId !== actor.userId) {
         throw new ForbiddenException(
@@ -53,42 +52,58 @@ export class CommentService {
       }
     }
 
-    const articleExists = this.db.articles.some(
-      (article) => article.id === dto.articleId,
-    );
+    const articleExists = await this.prisma.article.findUnique({
+      where: { id: dto.articleId },
+      select: { id: true },
+    });
 
     if (!articleExists) {
       throw new UnprocessableEntityException('Article does not exist');
     }
 
-    const comment: Comment = {
-      id: randomUUID(),
-      content: dto.content,
-      articleId: dto.articleId,
-      authorId: dto.authorId ?? null,
-      createdAt: Date.now(),
-    };
+    const comment = await this.prisma.comment.create({
+      data: {
+        content: dto.content,
+        articleId: dto.articleId,
+        authorId: dto.authorId ?? null,
+      },
+    });
 
-    this.db.comments.push(comment);
-    return comment;
+    return this.toResponse(comment);
   }
 
-  delete(id: string, actor?: AuthUser): void {
-    const index = this.db.comments.findIndex((item) => item.id === id);
-    if (index === -1) {
+  async delete(id: string, actor?: AuthUser): Promise<void> {
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
+    if (!comment) {
       throw new NotFoundException('Comment not found');
     }
 
     if (
       process.env.TEST_MODE === 'auth' &&
       actor?.role === UserRole.EDITOR &&
-      this.db.comments[index].authorId !== actor.userId
+      comment.authorId !== actor.userId
     ) {
       throw new ForbiddenException(
         'Insufficient permissions for this operation',
       );
     }
 
-    this.db.comments.splice(index, 1);
+    await this.prisma.comment.delete({ where: { id } });
+  }
+
+  private toResponse(comment: {
+    id: string;
+    content: string;
+    articleId: string;
+    authorId: string | null;
+    createdAt: Date;
+  }): Comment {
+    return {
+      id: comment.id,
+      content: comment.content,
+      articleId: comment.articleId,
+      authorId: comment.authorId,
+      createdAt: comment.createdAt.getTime(),
+    };
   }
 }

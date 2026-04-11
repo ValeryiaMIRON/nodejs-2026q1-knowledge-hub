@@ -63,7 +63,7 @@ export class CommentController {
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user?: AuthUser,
-  ): void {
-    this.commentService.delete(id, user);
+  ): Promise<void> {
+    return this.commentService.delete(id, user);
   }
 }

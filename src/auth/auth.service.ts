@@ -3,11 +3,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { UserRole as PrismaUserRole } from '@prisma/client';
 import { Secret, SignOptions, sign, verify } from 'jsonwebtoken';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
-import { User } from '../common/interfaces/user.interface';
-import { InMemoryDbService } from '../storage/in-memory-db.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { UserService } from '../user/user.service';
 import { LoginDto } from './dto/login.dto';
@@ -21,7 +21,7 @@ type AuthTokens = {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly db: InMemoryDbService,
+    private readonly prisma: PrismaService,
     private readonly userService: UserService,
   ) {}
 
@@ -30,10 +30,13 @@ export class AuthService {
     return this.userService.create({ ...dto, role });
   }
 
-  login(dto: LoginDto): AuthTokens {
-    const user = this.db.users.find(
-      (item) => item.login === dto.login && item.password === dto.password,
-    );
+  async login(dto: LoginDto): Promise<AuthTokens> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        login: dto.login,
+        password: dto.password,
+      },
+    });
 
     if (!user) {
       throw new ForbiddenException('Incorrect login or password');
@@ -42,13 +45,15 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
-  refresh(dto?: RefreshDto): AuthTokens {
+  async refresh(dto?: RefreshDto): Promise<AuthTokens> {
     if (!dto?.refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
 
     const payload = this.verifyRefreshToken(dto.refreshToken);
-    const user = this.db.users.find((item) => item.id === payload.userId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.userId },
+    });
     if (!user) {
       throw new ForbiddenException('Invalid or expired refresh token');
     }
@@ -82,11 +87,15 @@ export class AuthService {
     }
   }
 
-  private issueTokens(user: User): AuthTokens {
+  private issueTokens(user: {
+    id: string;
+    login: string;
+    role: PrismaUserRole;
+  }): AuthTokens {
     const payload: AuthUser = {
       userId: user.id,
       login: user.login,
-      role: user.role,
+      role: this.fromPrismaRole(user.role),
     };
 
     const accessTokenExpiresIn = (process.env.TOKEN_EXPIRE_TIME ||
@@ -119,5 +128,9 @@ export class AuthService {
 
   private getRefreshSecret(): Secret {
     return process.env.JWT_SECRET_REFRESH_KEY || '';
+  }
+
+  private fromPrismaRole(role: PrismaUserRole): UserRole {
+    return role.toLowerCase() as UserRole;
   }
 }

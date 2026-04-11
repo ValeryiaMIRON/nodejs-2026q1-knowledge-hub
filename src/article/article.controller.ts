@@ -71,7 +71,9 @@ export class ArticleController {
   @ApiResponse({ status: 204, description: 'Article deleted' })
   @ApiResponse({ status: 400, description: 'Invalid UUID' })
   @ApiResponse({ status: 404, description: 'Article not found' })
-  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): void {
-    this.articleService.delete(id);
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<void> {
+    return this.articleService.delete(id);
   }
 }

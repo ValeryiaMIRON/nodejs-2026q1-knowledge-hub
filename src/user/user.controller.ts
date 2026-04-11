@@ -42,7 +42,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found' })
   findById(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-  ): UserResponseDto {
+  ): Promise<UserResponseDto> {
     return this.userService.findById(id);
   }
 
@@ -51,7 +51,7 @@ export class UserController {
   @ApiOperation({ summary: 'Create user' })
   @ApiResponse({ status: 201, type: UserResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid body' })
-  create(@Body() dto: CreateUserDto): UserResponseDto {
+  create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     return this.userService.create(dto);
   }
 
@@ -65,7 +65,7 @@ export class UserController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateUserDto,
     @CurrentUser() user?: AuthUser,
-  ): UserResponseDto {
+  ): Promise<UserResponseDto> {
     const isRoleUpdate = dto.role !== undefined;
     const hasAnyPasswordField =
       dto.oldPassword !== undefined || dto.newPassword !== undefined;
@@ -115,7 +115,7 @@ export class UserController {
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user?: AuthUser,
-  ): void {
+  ): Promise<void> {
     if (
       process.env.TEST_MODE === 'auth' &&
       user &&
@@ -127,6 +127,6 @@ export class UserController {
       );
     }
 
-    this.userService.delete(id);
+    return this.userService.delete(id);
   }
 }

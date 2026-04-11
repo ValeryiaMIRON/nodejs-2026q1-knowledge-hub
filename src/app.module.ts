@@ -8,10 +8,11 @@ import { ArticleModule } from './article/article.module';
 import { CategoryModule } from './category/category.module';
 import { CommentModule } from './comment/comment.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
-import { StorageModule } from './storage/storage.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -20,7 +21,7 @@ import { RolesGuard } from './auth/roles.guard';
     ArticleModule,
     CategoryModule,
     CommentModule,
-    StorageModule,
+    PrismaModule,
   ],
   controllers: [AppController],
   providers: [
