@@ -9,7 +9,7 @@ REST API for a Knowledge Hub platform built with NestJS and TypeScript.
 - TypeScript
 - class-validator and global ValidationPipe
 - Swagger via @nestjs/swagger
-- In-memory storage
+- Prisma ORM + PostgreSQL
 
 ## Requirements
 
@@ -96,6 +96,16 @@ Main variables:
 - JWT_SECRET_REFRESH_KEY
 - TOKEN_EXPIRE_TIME
 - TOKEN_REFRESH_EXPIRE_TIME
+- DATABASE_URL
+
+DATABASE_URL examples:
+
+- local app + docker db: postgresql://postgres:postgres@localhost:5432/knowledge_hub?schema=public&connection_limit=5
+- docker app + docker db: postgresql://postgres:postgres@db:5432/knowledge_hub?schema=public&connection_limit=5
+
+Note:
+
+- docker-compose sets DATABASE_URL for app service to use db hostname.
 
 ## API Routes
 
