@@ -120,10 +120,6 @@ export class AuthService {
   }
 
   private resolveDefaultSignupRole(login: string): UserRole {
-    if (login === 'TEST_AUTH_LOGIN') {
-      return UserRole.ADMIN;
-    }
-
     return UserRole.VIEWER;
   }
 
