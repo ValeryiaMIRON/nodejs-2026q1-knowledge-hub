@@ -44,7 +44,7 @@ export class CommentService {
   }
 
   async create(dto: CreateCommentDto, actor?: AuthUser): Promise<Comment> {
-    if (process.env.TEST_MODE === 'auth' && actor?.role === UserRole.EDITOR) {
+    if (actor?.role === UserRole.EDITOR) {
       if (dto.authorId !== actor.userId) {
         throw new ForbiddenException(
           'Insufficient permissions for this operation',
@@ -79,7 +79,6 @@ export class CommentService {
     }
 
     if (
-      process.env.TEST_MODE === 'auth' &&
       actor?.role === UserRole.EDITOR &&
       comment.authorId !== actor.userId
     ) {
