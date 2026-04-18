@@ -4,14 +4,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UserRole as PrismaUserRole } from '@prisma/client';
+import { compare } from 'bcrypt';
 import { Secret, SignOptions, sign, verify } from 'jsonwebtoken';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateUserDto } from '../user/dto/create-user.dto';
 import { UserService } from '../user/user.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { SignupDto } from './dto/signup.dto';
 
 type AuthTokens = {
   accessToken: string;
@@ -25,20 +26,24 @@ export class AuthService {
     private readonly userService: UserService,
   ) {}
 
-  signup(dto: CreateUserDto) {
-    const role = dto.role ?? this.resolveDefaultSignupRole(dto.login);
+  signup(dto: SignupDto) {
+    const role = this.resolveDefaultSignupRole(dto.login);
     return this.userService.create({ ...dto, role });
   }
 
   async login(dto: LoginDto): Promise<AuthTokens> {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findUnique({
       where: {
         login: dto.login,
-        password: dto.password,
       },
     });
 
     if (!user) {
+      throw new ForbiddenException('Incorrect login or password');
+    }
+
+    const isPasswordValid = await compare(dto.password, user.password);
+    if (!isPasswordValid) {
       throw new ForbiddenException('Incorrect login or password');
     }
 

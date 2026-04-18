@@ -1,10 +1,10 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
-import { CreateUserDto } from '../user/dto/create-user.dto';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { SignupDto } from './dto/signup.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -15,7 +15,7 @@ export class AuthController {
   @Post('signup')
   @ApiOperation({ summary: 'Signup' })
   @ApiResponse({ status: 201, description: 'User created' })
-  signup(@Body() dto: CreateUserDto) {
+  signup(@Body() dto: SignupDto) {
     return this.authService.signup(dto);
   }
 
