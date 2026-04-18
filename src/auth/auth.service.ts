@@ -50,9 +50,23 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  async logout(refreshToken: string): Promise<void> {
+    await this.prisma.revokedToken.create({
+      data: { token: refreshToken },
+    });
+  }
+
   async refresh(dto?: RefreshDto): Promise<AuthTokens> {
     if (!dto?.refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
+    }
+
+    // Проверяем, не отозван ли токен
+    const isRevoked = await this.prisma.revokedToken.findUnique({
+      where: { token: dto.refreshToken },
+    });
+    if (isRevoked) {
+      throw new ForbiddenException('Invalid or expired refresh token');
     }
 
     const payload = this.verifyRefreshToken(dto.refreshToken);

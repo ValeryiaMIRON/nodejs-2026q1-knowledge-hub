@@ -39,4 +39,18 @@ export class AuthController {
   refresh(@Body() dto?: { refreshToken?: string }) {
     return this.authService.refresh(dto as RefreshDto | undefined);
   }
+
+  @Public()
+  @Post('logout')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Logout (invalidate refresh token)' })
+  @ApiResponse({ status: 200, description: 'Logged out' })
+  @ApiResponse({ status: 400, description: 'No refresh token' })
+  async logout(@Body() dto: { refreshToken?: string }) {
+    if (!dto?.refreshToken) {
+      return { message: 'No refresh token provided' };
+    }
+    await this.authService.logout(dto.refreshToken);
+    return { message: 'Logged out' };
+  }
 }
