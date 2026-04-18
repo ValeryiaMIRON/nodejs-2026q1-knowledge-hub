@@ -98,10 +98,10 @@ export class AuthService {
       role: this.fromPrismaRole(user.role),
     };
 
-    const accessTokenExpiresIn = (process.env.TOKEN_EXPIRE_TIME ||
-      '1h') as SignOptions['expiresIn'];
-    const refreshTokenExpiresIn = (process.env.TOKEN_REFRESH_EXPIRE_TIME ||
-      '24h') as SignOptions['expiresIn'];
+    const accessTokenExpiresIn = (process.env.JWT_ACCESS_TTL ||
+      '15m') as SignOptions['expiresIn'];
+    const refreshTokenExpiresIn = (process.env.JWT_REFRESH_TTL ||
+      '7d') as SignOptions['expiresIn'];
 
     const accessToken = sign(payload, this.getAccessSecret(), {
       expiresIn: accessTokenExpiresIn,
@@ -123,11 +123,11 @@ export class AuthService {
   }
 
   private getAccessSecret(): Secret {
-    return process.env.JWT_SECRET_KEY || '';
+    return process.env.JWT_SECRET || '';
   }
 
   private getRefreshSecret(): Secret {
-    return process.env.JWT_SECRET_REFRESH_KEY || '';
+    return process.env.JWT_REFRESH_SECRET || '';
   }
 
   private fromPrismaRole(role: PrismaUserRole): UserRole {
