@@ -27,7 +27,7 @@ export class AuthService {
   ) {}
 
   signup(dto: SignupDto) {
-    const role = this.resolveDefaultSignupRole(dto.login);
+    const role = this.resolveDefaultSignupRole();
     return this.userService.create({ ...dto, role });
   }
 
@@ -119,7 +119,7 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private resolveDefaultSignupRole(login: string): UserRole {
+  private resolveDefaultSignupRole(): UserRole {
     return UserRole.VIEWER;
   }
 
