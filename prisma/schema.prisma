@@ -79,3 +79,9 @@ model Comment {
 
   @@index([articleId])
 }
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  createdAt DateTime @default(now())
+}

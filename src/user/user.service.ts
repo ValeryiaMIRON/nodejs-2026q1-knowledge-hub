@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole as PrismaUserRole } from '@prisma/client';
+import { Prisma, UserRole as PrismaUserRole } from '@prisma/client';
+import { compare, hash } from 'bcrypt';
 import { UserRole } from '../common/enums/user-role.enum';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { paginate } from '../common/utils/pagination.util';
@@ -39,18 +40,25 @@ export class UserService {
   }
 
   async create(dto: CreateUserDto): Promise<UserResponseDto> {
-    const user = await this.prisma.user.create({
-      data: {
-        login: dto.login,
-        password: dto.password,
-        role: this.toPrismaRole(dto.role ?? UserRole.VIEWER),
-      },
-    });
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          login: dto.login,
+          password: await this.hashPassword(dto.password),
+          role: this.toPrismaRole(dto.role ?? UserRole.VIEWER),
+        },
+      });
 
-    return this.toResponse(user);
+      return this.toResponse(user);
+    } catch (error) {
+      this.handleUserWriteError(error);
+    }
   }
 
-  async updatePassword(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
+  async updatePassword(
+    id: string,
+    dto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -76,14 +84,15 @@ export class UserService {
       throw new BadRequestException('oldPassword and newPassword are required');
     }
 
-    if (user.password !== dto.oldPassword) {
+    const isOldPasswordValid = await compare(dto.oldPassword, user.password);
+    if (!isOldPasswordValid) {
       throw new ForbiddenException('Old password is wrong');
     }
 
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
-        password: dto.newPassword,
+        password: await this.hashPassword(dto.newPassword),
       },
     });
 
@@ -130,5 +139,21 @@ export class UserService {
 
   private fromPrismaRole(role: PrismaUserRole): UserRole {
     return role.toLowerCase() as UserRole;
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = Number(process.env.CRYPT_SALT || 10);
+    return hash(password, saltRounds);
+  }
+
+  private handleUserWriteError(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new BadRequestException('Login is already taken');
+    }
+
+    throw error;
   }
 }

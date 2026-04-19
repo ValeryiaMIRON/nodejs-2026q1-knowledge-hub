@@ -61,7 +61,7 @@ export class ArticleService {
   }
 
   async create(dto: CreateArticleDto, actor?: AuthUser): Promise<Article> {
-    if (process.env.TEST_MODE === 'auth' && actor?.role === UserRole.EDITOR) {
+    if (actor?.role === UserRole.EDITOR) {
       if (dto.authorId !== actor.userId) {
         throw new ForbiddenException(
           'Insufficient permissions for this operation',
@@ -103,7 +103,6 @@ export class ArticleService {
     }
 
     if (
-      process.env.TEST_MODE === 'auth' &&
       actor?.role === UserRole.EDITOR &&
       article.authorId !== actor.userId
     ) {

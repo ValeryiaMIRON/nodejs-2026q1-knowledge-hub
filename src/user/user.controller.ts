@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -56,6 +55,7 @@ export class UserController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update user password' })
   @ApiResponse({ status: 200, type: UserResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid UUID or body' })
@@ -64,7 +64,6 @@ export class UserController {
   updatePassword(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateUserDto,
-    @CurrentUser() user?: AuthUser,
   ): Promise<UserResponseDto> {
     const isRoleUpdate = dto.role !== undefined;
     const hasAnyPasswordField =
@@ -81,32 +80,11 @@ export class UserController {
       throw new BadRequestException('oldPassword and newPassword are required');
     }
 
-    if (
-      process.env.TEST_MODE === 'auth' &&
-      user &&
-      user.role !== UserRole.ADMIN &&
-      user.userId !== id
-    ) {
-      throw new ForbiddenException(
-        'Insufficient permissions for this operation',
-      );
-    }
-
-    if (
-      process.env.TEST_MODE === 'auth' &&
-      user &&
-      dto.role !== undefined &&
-      user.role !== UserRole.ADMIN
-    ) {
-      throw new ForbiddenException(
-        'Insufficient permissions for this operation',
-      );
-    }
-
     return this.userService.updatePassword(id, dto);
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete user' })
   @ApiResponse({ status: 204, description: 'User deleted' })
@@ -114,19 +92,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @CurrentUser() user?: AuthUser,
   ): Promise<void> {
-    if (
-      process.env.TEST_MODE === 'auth' &&
-      user &&
-      user.role !== UserRole.ADMIN &&
-      user.userId !== id
-    ) {
-      throw new ForbiddenException(
-        'Insufficient permissions for this operation',
-      );
-    }
-
     return this.userService.delete(id);
   }
 }
