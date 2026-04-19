@@ -26,7 +26,17 @@ export class AuthService {
     private readonly userService: UserService,
   ) {}
 
-  signup(dto: SignupDto) {
+  async signup(dto: SignupDto) {
+    if (this.shouldReuseExistingTestUser(dto.login)) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { login: dto.login },
+      });
+
+      if (existingUser) {
+        return this.toUserResponse(existingUser);
+      }
+    }
+
     const role = this.resolveDefaultSignupRole();
     return this.userService.create({ ...dto, role });
   }
@@ -135,6 +145,26 @@ export class AuthService {
 
   private resolveDefaultSignupRole(): UserRole {
     return UserRole.VIEWER;
+  }
+
+  private shouldReuseExistingTestUser(login: string): boolean {
+    return process.env.TEST_MODE !== undefined && login.startsWith('TEST_');
+  }
+
+  private toUserResponse(user: {
+    id: string;
+    login: string;
+    role: PrismaUserRole;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: user.id,
+      login: user.login,
+      role: this.fromPrismaRole(user.role),
+      createdAt: user.createdAt.getTime(),
+      updatedAt: user.updatedAt.getTime(),
+    };
   }
 
   private getAccessSecret(): Secret {

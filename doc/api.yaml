@@ -157,6 +157,8 @@ paths:
                 $ref: '#/components/schemas/User'
         400:
           description: Bad request
+        429:
+          description: Too many requests from this IP
   /auth/login:
     post:
       tags:
@@ -194,6 +196,8 @@ paths:
                     type: string
         403:
           description: Incorrect login or password
+        429:
+          description: Too many requests from this IP
   /auth/refresh:
     post:
       tags:

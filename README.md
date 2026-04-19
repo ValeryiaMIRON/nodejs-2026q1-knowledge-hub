@@ -128,11 +128,14 @@ Notes:
 - POST /auth/signup
 - POST /auth/login
 - POST /auth/refresh
+- POST /auth/logout
 
 Notes:
 
 - /auth/login returns accessToken and refreshToken.
 - /auth/refresh returns new token pair.
+- /auth/signup and /auth/login are rate-limited by IP: 5 requests per 60 seconds.
+- Rate limiting is disabled during automated tests.
 
 ### Articles
 
