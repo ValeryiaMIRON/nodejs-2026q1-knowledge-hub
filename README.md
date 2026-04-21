@@ -218,22 +218,31 @@ Request logging middleware is enabled globally and logs method and URL for incom
 
 ## Testing
 
-Run all tests:
+Run unit tests with Vitest:
 
 ```bash
 npm run test
 ```
 
-Run specific suites:
+Equivalent unit-test command:
 
 ```bash
-npm run test -- users.e2e.spec.ts
-npm run test -- articles.e2e.spec.ts
-npm run test -- categories.e2e.spec.ts
-npm run test -- comments.e2e.spec.ts
+npm run test:unit
 ```
 
-Authorization-related suites:
+Run unit tests with coverage:
+
+```bash
+npm run test:coverage
+```
+
+Run e2e tests with Jest:
+
+```bash
+npm run test:e2e
+```
+
+Run authorization-related e2e suites:
 
 ```bash
 npm run test:auth
