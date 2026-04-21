@@ -15,6 +15,7 @@ export default defineConfig({
         'src/**/*.module.ts',
         'src/**/*.controller.ts',
         'src/**/*.dto.ts',
+        'src/**/*.interface.ts',
         'src/**/index.ts',
       ],
       thresholds: {
