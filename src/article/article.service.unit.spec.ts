@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ArticleStatus as PrismaArticleStatus } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -251,6 +255,79 @@ describe('ArticleService', () => {
     );
 
     expect(result.status).toBe(ArticleStatus.ARCHIVED);
+  });
+
+  it('allows update when status remains unchanged', async () => {
+    prismaMock.article.findUnique.mockResolvedValue(buildArticle());
+    prismaMock.article.update.mockResolvedValue(buildArticle());
+
+    const result = await service.update(
+      'article-id',
+      {
+        status: ArticleStatus.DRAFT,
+      },
+      adminActor,
+    );
+
+    expect(result.status).toBe(ArticleStatus.DRAFT);
+  });
+
+  it('throws BadRequestException for invalid transition from draft to archived', async () => {
+    prismaMock.article.findUnique.mockResolvedValue(buildArticle());
+
+    await expect(
+      service.update(
+        'article-id',
+        {
+          status: ArticleStatus.ARCHIVED,
+        },
+        adminActor,
+      ),
+    ).rejects.toThrowError(
+      new BadRequestException('Invalid article status transition'),
+    );
+
+    expect(prismaMock.article.update).not.toHaveBeenCalled();
+  });
+
+  it('throws BadRequestException for invalid transition from published to draft', async () => {
+    prismaMock.article.findUnique.mockResolvedValue(
+      buildArticle({ status: PrismaArticleStatus.PUBLISHED }),
+    );
+
+    await expect(
+      service.update(
+        'article-id',
+        {
+          status: ArticleStatus.DRAFT,
+        },
+        adminActor,
+      ),
+    ).rejects.toThrowError(
+      new BadRequestException('Invalid article status transition'),
+    );
+
+    expect(prismaMock.article.update).not.toHaveBeenCalled();
+  });
+
+  it('throws BadRequestException for invalid transition from archived to published', async () => {
+    prismaMock.article.findUnique.mockResolvedValue(
+      buildArticle({ status: PrismaArticleStatus.ARCHIVED }),
+    );
+
+    await expect(
+      service.update(
+        'article-id',
+        {
+          status: ArticleStatus.PUBLISHED,
+        },
+        adminActor,
+      ),
+    ).rejects.toThrowError(
+      new BadRequestException('Invalid article status transition'),
+    );
+
+    expect(prismaMock.article.update).not.toHaveBeenCalled();
   });
 
   it('replaces tags when dto.tags is provided', async () => {

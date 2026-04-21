@@ -1,12 +1,10 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ArticleStatus as PrismaArticleStatus,
-  Prisma,
-} from '@prisma/client';
+import { ArticleStatus as PrismaArticleStatus, Prisma } from '@prisma/client';
 import { ArticleStatus } from '../common/enums/article-status.enum';
 import { UserRole } from '../common/enums/user-role.enum';
 import { Article } from '../common/interfaces/article.interface';
@@ -102,10 +100,7 @@ export class ArticleService {
       throw new NotFoundException('Article not found');
     }
 
-    if (
-      actor?.role === UserRole.EDITOR &&
-      article.authorId !== actor.userId
-    ) {
+    if (actor?.role === UserRole.EDITOR && article.authorId !== actor.userId) {
       throw new ForbiddenException(
         'Insufficient permissions for this operation',
       );
@@ -114,7 +109,13 @@ export class ArticleService {
     const data: Prisma.ArticleUncheckedUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.content !== undefined) data.content = dto.content;
-    if (dto.status !== undefined) data.status = this.toPrismaStatus(dto.status);
+    if (dto.status !== undefined) {
+      this.assertValidStatusTransition(
+        this.fromPrismaStatus(article.status),
+        dto.status,
+      );
+      data.status = this.toPrismaStatus(dto.status);
+    }
     if (dto.authorId !== undefined) data.authorId = dto.authorId;
     if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
 
@@ -177,6 +178,25 @@ export class ArticleService {
     return PrismaArticleStatus[
       status.toUpperCase() as keyof typeof PrismaArticleStatus
     ];
+  }
+
+  private assertValidStatusTransition(
+    currentStatus: ArticleStatus,
+    nextStatus: ArticleStatus,
+  ): void {
+    if (currentStatus === nextStatus) {
+      return;
+    }
+
+    const allowedTransitions: Record<ArticleStatus, ArticleStatus[]> = {
+      [ArticleStatus.DRAFT]: [ArticleStatus.PUBLISHED],
+      [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+      [ArticleStatus.ARCHIVED]: [],
+    };
+
+    if (!allowedTransitions[currentStatus].includes(nextStatus)) {
+      throw new BadRequestException('Invalid article status transition');
+    }
   }
 
   private fromPrismaStatus(status: PrismaArticleStatus): ArticleStatus {
