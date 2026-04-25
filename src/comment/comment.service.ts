@@ -26,9 +26,11 @@ export class CommentService {
       throw new BadRequestException('articleId query param is required');
     }
 
-    const filtered = (await this.prisma.comment.findMany({
-      where: { articleId: query.articleId },
-    })).map((comment) => this.toResponse(comment));
+    const filtered = (
+      await this.prisma.comment.findMany({
+        where: { articleId: query.articleId },
+      })
+    ).map((comment) => this.toResponse(comment));
 
     const sorted = sortItems(filtered, query.sortBy, query.order);
     return paginate(sorted, query.page, query.limit);
@@ -78,10 +80,7 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    if (
-      actor?.role === UserRole.EDITOR &&
-      comment.authorId !== actor.userId
-    ) {
+    if (actor?.role === UserRole.EDITOR && comment.authorId !== actor.userId) {
       throw new ForbiddenException(
         'Insufficient permissions for this operation',
       );
