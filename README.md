@@ -201,6 +201,12 @@ Notes:
 - Global ValidationPipe is enabled.
 - Incoming request bodies are validated with DTO classes.
 - UUID params are validated with ParseUUIDPipe.
+- Global exception filter catches unhandled errors and returns normalized JSON responses.
+- Custom error classes are available for common HTTP error scenarios:
+- `NotFoundError` (404)
+- `ValidationError` (400)
+- `UnauthorizedError` (401)
+- `ForbiddenError` (403)
 
 Typical status codes:
 
@@ -215,6 +221,45 @@ Typical status codes:
 ## Middleware
 
 Request logging middleware is enabled globally and logs method and URL for incoming requests.
+
+## Logging and Runtime Error Handling
+
+Logger behavior is controlled by environment variables:
+
+- `LOG_LEVEL` (default: `log`)
+- `LOG_MAX_FILE_SIZE` in KB (default: `1024`)
+
+Supported log levels:
+
+- `log`
+- `debug`
+- `warn`
+- `error`
+- `verbose`
+
+Request/response logging:
+
+- Incoming requests include method, URL, query params, and request body
+- Outgoing responses include status code and response time
+- Sensitive fields (`password`, `token`, `authorization`) are masked as `[REDACTED]`
+
+Log output modes:
+
+- Development: human-readable logs
+- Production: structured JSON logs
+
+File logging and rotation:
+
+- Logs are written to `logs/app.log`
+- Rotation is size-based using `LOG_MAX_FILE_SIZE`
+- Rotated files use timestamp suffix (for example, `app-2026-04-25T08-05-16-000Z.log`)
+
+Process-level safety handlers:
+
+- `uncaughtException` and `unhandledRejection` are captured
+- Errors are logged at error level
+- Graceful shutdown is performed (`app.close()`, Prisma disconnect)
+- Process exits with code `1`
 
 ## Testing
 
