@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,10 +11,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ValidationError } from '../common/errors/validation.error';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
-import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -70,14 +68,14 @@ export class UserController {
       dto.oldPassword !== undefined || dto.newPassword !== undefined;
 
     if (!isRoleUpdate && !hasAnyPasswordField) {
-      throw new BadRequestException('Update payload is required');
+      throw new ValidationError('Update payload is required');
     }
 
     if (
       hasAnyPasswordField &&
       (dto.oldPassword === undefined || dto.newPassword === undefined)
     ) {
-      throw new BadRequestException('oldPassword and newPassword are required');
+      throw new ValidationError('oldPassword and newPassword are required');
     }
 
     return this.userService.updatePassword(id, dto);
