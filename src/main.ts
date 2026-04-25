@@ -1,8 +1,10 @@
-import { LogLevel, ValidationPipe } from '@nestjs/common';
+import { INestApplication, LogLevel, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { FileLoggerService } from './common/logging/file-logger.service';
+import { PrismaService } from './prisma/prisma.service';
 
 const SUPPORTED_LOG_LEVELS: LogLevel[] = [
   'log',
@@ -22,10 +24,59 @@ function resolveLogLevels(): LogLevel[] {
   return SUPPORTED_LOG_LEVELS.slice(startIndex);
 }
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: resolveLogLevels(),
+async function gracefulShutdown(app: INestApplication): Promise<void> {
+  try {
+    await app.close();
+  } catch {
+    // Ignore close errors during forced shutdown flow.
+  }
+
+  try {
+    const prisma = app.get(PrismaService, { strict: false });
+    if (prisma) {
+      await prisma.$disconnect();
+    }
+  } catch {
+    // Ignore prisma retrieval/disconnect errors during shutdown.
+  }
+}
+
+function registerProcessErrorHandlers(
+  app: INestApplication,
+  logger: FileLoggerService,
+): void {
+  const handleFatalError = async (
+    type: 'uncaughtException' | 'unhandledRejection',
+    error: unknown,
+  ) => {
+    if (error instanceof Error) {
+      logger.error(`[${type}] ${error.message}`, error.stack, 'Process');
+    } else {
+      logger.error(`[${type}] ${JSON.stringify(error)}`, undefined, 'Process');
+    }
+
+    await gracefulShutdown(app);
+    process.exit(1);
+  };
+
+  process.on('uncaughtException', (error) => {
+    void handleFatalError('uncaughtException', error);
   });
+
+  process.on('unhandledRejection', (reason) => {
+    void handleFatalError('unhandledRejection', reason);
+  });
+}
+
+async function bootstrap() {
+  const levels = resolveLogLevels();
+  const logger = new FileLoggerService(levels);
+
+  const app = await NestFactory.create(AppModule, {
+    logger,
+  });
+
+  registerProcessErrorHandlers(app, logger);
 
   app.useGlobalPipes(
     new ValidationPipe({
