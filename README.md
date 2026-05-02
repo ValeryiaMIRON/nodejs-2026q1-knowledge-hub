@@ -201,6 +201,8 @@ http://localhost:4000/doc
 - POST /ai/articles/:articleId/analyze
 - POST /ai/generate
 - GET /ai/usage
+- POST /ai/conversations
+- POST /ai/conversations/:conversationId/messages
 
 Example requests:
 
@@ -230,6 +232,20 @@ curl -X POST "http://localhost:4000/ai/generate" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <access-token>" \
   -d '{"prompt":"Explain NestJS in one short paragraph"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/conversations" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"message":"What is NestJS?"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/conversations/<conversationId>/messages" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"message":"Can you give a code example?"}'
 ```
 
 ## Validate Gemini Key Before App Run
