@@ -199,6 +199,7 @@ http://localhost:4000/doc
 - POST /ai/articles/:articleId/summarize
 - POST /ai/articles/:articleId/translate
 - POST /ai/articles/:articleId/analyze
+- POST /ai/generate
 - GET /ai/usage
 
 Example requests:
@@ -223,6 +224,33 @@ curl -X POST "http://localhost:4000/ai/articles/<article-id>/analyze" \
   -H "Authorization: Bearer <access-token>" \
   -d '{"task":"review"}'
 ```
+
+```bash
+curl -X POST "http://localhost:4000/ai/generate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"prompt":"Explain NestJS in one short paragraph"}'
+```
+
+## Validate Gemini Key Before App Run
+
+Use this direct provider check to verify that your key and quota are valid.
+
+```bash
+curl -s -o /tmp/gemini_check.json -w "%{http_code}\n" \
+  -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=<YOUR_GEMINI_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hello in one short sentence"}]}]}'
+
+cat /tmp/gemini_check.json
+```
+
+Expected statuses:
+
+- 200: key and provider access are valid.
+- 401: invalid API key.
+- 403: project/API permission issue or regional restriction.
+- 429: quota exhausted or free-tier quota unavailable.
 
 ## Known Limitations
 

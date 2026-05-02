@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
+  GeminiContent,
   GeminiGenerateContentResponse,
   GeminiGenerateTextResult,
 } from './gemini.types';
@@ -29,6 +30,18 @@ export class GeminiService {
   async generateTextWithMeta(
     prompt: string,
   ): Promise<GeminiGenerateTextResult> {
+    return this.generateContents([{ role: 'user', parts: [{ text: prompt }] }]);
+  }
+
+  async generateWithHistory(
+    contents: GeminiContent[],
+  ): Promise<GeminiGenerateTextResult> {
+    return this.generateContents(contents);
+  }
+
+  private async generateContents(
+    contents: GeminiContent[],
+  ): Promise<GeminiGenerateTextResult> {
     if (!this.apiKey) {
       throw new InternalServerErrorException(
         'Gemini API key is not configured',
@@ -36,9 +49,7 @@ export class GeminiService {
     }
 
     const url = this.buildGenerateContentUrl();
-    const body = {
-      contents: [{ parts: [{ text: prompt }] }],
-    };
+    const body = { contents };
 
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {

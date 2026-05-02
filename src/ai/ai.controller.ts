@@ -10,15 +10,25 @@ import {
 } from './dto/ai-response.dto';
 import { AiUsageResponseDto } from './dto/ai-usage-response.dto';
 import { ArticleIdParamDto } from './dto/article-id-param.dto';
+import {
+  ConversationMessageDto,
+  ConversationParamDto,
+  ConversationResponseDto,
+  StartConversationDto,
+} from './dto/conversation.dto';
 import { GenerateDto } from './dto/generate.dto';
 import { SummarizeArticleDto } from './dto/summarize-article.dto';
 import { TranslateArticleDto } from './dto/translate-article.dto';
+import { ConversationService } from './conversation/conversation.service';
 
 @ApiTags('AI')
 @Controller('ai')
 @UseGuards(AiRateLimitGuard)
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly conversationService: ConversationService,
+  ) {}
 
   @Get('usage')
   @ApiOperation({ summary: 'Get AI usage statistics' })
@@ -99,5 +109,45 @@ export class AiController {
   async generate(@Body() body: GenerateDto): Promise<{ text: string }> {
     const text = await this.aiService.generate(body.prompt);
     return { text };
+  }
+
+  @Post('conversations')
+  @ApiOperation({ summary: 'Start a new multi-turn AI conversation' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation created with first AI reply',
+    type: ConversationResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request body' })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
+  startConversation(
+    @Body() body: StartConversationDto,
+  ): Promise<ConversationResponseDto> {
+    return this.conversationService.createConversation(body.message);
+  }
+
+  @Post('conversations/:conversationId/messages')
+  @ApiOperation({
+    summary: 'Send a follow-up message in an existing conversation',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AI reply to the message',
+    type: ConversationResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request body or UUID' })
+  @ApiResponse({
+    status: 404,
+    description: 'Conversation not found or expired',
+  })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
+  sendMessage(
+    @Param() params: ConversationParamDto,
+    @Body() body: ConversationMessageDto,
+  ): Promise<ConversationResponseDto> {
+    return this.conversationService.sendMessage(
+      params.conversationId,
+      body.message,
+    );
   }
 }

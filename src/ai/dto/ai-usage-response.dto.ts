@@ -36,6 +36,20 @@ class LatencyByEndpointDto {
   generate: EndpointLatencyDto;
 }
 
+class P95LatencyByEndpointDto {
+  @ApiProperty({ description: 'p95 latency in ms' })
+  summarize: number;
+
+  @ApiProperty({ description: 'p95 latency in ms' })
+  translate: number;
+
+  @ApiProperty({ description: 'p95 latency in ms' })
+  analyze: number;
+
+  @ApiProperty({ description: 'p95 latency in ms' })
+  generate: number;
+}
+
 class CacheStatsDto {
   @ApiProperty()
   hits: number;
@@ -66,6 +80,20 @@ class TokenUsageDto {
   totalTokenCount: number;
 }
 
+class RecentRequestEntryDto {
+  @ApiProperty()
+  timestamp: number;
+
+  @ApiProperty()
+  endpoint: string;
+
+  @ApiProperty()
+  durationMs: number;
+
+  @ApiProperty()
+  success: boolean;
+}
+
 export class AiUsageResponseDto {
   @ApiProperty()
   totalRequests: number;
@@ -73,12 +101,33 @@ export class AiUsageResponseDto {
   @ApiProperty({ type: EndpointCounterDto })
   requestsByEndpoint: EndpointCounterDto;
 
+  @ApiProperty({
+    type: EndpointCounterDto,
+    description: 'Error count per endpoint',
+  })
+  errorsByEndpoint: EndpointCounterDto;
+
   @ApiProperty({ type: LatencyByEndpointDto })
   latencyByEndpoint: LatencyByEndpointDto;
+
+  @ApiProperty({
+    type: P95LatencyByEndpointDto,
+    description: 'p95 latency per endpoint (ms)',
+  })
+  p95LatencyByEndpoint: P95LatencyByEndpointDto;
 
   @ApiProperty({ type: CacheByEndpointDto })
   cacheByEndpoint: CacheByEndpointDto;
 
   @ApiProperty({ type: TokenUsageDto })
   tokenUsage: TokenUsageDto;
+
+  @ApiProperty({
+    type: [RecentRequestEntryDto],
+    description: 'Last 20 requests',
+  })
+  recentRequests: RecentRequestEntryDto[];
+
+  @ApiProperty({ description: 'Service uptime in milliseconds' })
+  uptimeMs: number;
 }

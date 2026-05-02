@@ -1,3 +1,8 @@
+export interface GeminiContent {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+}
+
 export interface GeminiGenerateContentResponse {
   candidates?: Array<{
     content?: {

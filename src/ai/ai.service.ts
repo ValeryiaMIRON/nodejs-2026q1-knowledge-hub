@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyzeTask } from './dto/analyze-article.dto';
 import {
@@ -6,21 +8,14 @@ import {
   SummarizeArticleResponseDto,
   TranslateArticleResponseDto,
 } from './dto/ai-response.dto';
+import {
+  AnalyzePayloadDto,
+  TranslatePayloadDto,
+} from './dto/ai-structured-payloads.dto';
 import { AiUsageResponseDto } from './dto/ai-usage-response.dto';
 import { SummaryLength } from './dto/summarize-article.dto';
 import { GeminiService } from './gemini/gemini.service';
 import { AiPromptsService } from './prompts/ai-prompts.service';
-
-type AnalyzePayload = {
-  analysis: string;
-  suggestions: string[];
-  severity: 'info' | 'warning' | 'error';
-};
-
-type TranslatePayload = {
-  translatedText: string;
-  detectedLanguage: string;
-};
 
 type CacheEntry<T> = {
   value: T;
@@ -38,6 +33,13 @@ type LatencyStats = {
 type CacheStats = {
   hits: number;
   misses: number;
+};
+
+type RequestLogEntry = {
+  timestamp: number;
+  endpoint: string;
+  durationMs: number;
+  success: boolean;
 };
 
 @Injectable()
@@ -75,6 +77,22 @@ export class AiService {
     candidatesTokenCount: 0,
     totalTokenCount: 0,
   };
+  private readonly serviceStartedAt = Date.now();
+  private readonly errorsByEndpoint: Record<AiEndpoint, number> = {
+    summarize: 0,
+    translate: 0,
+    analyze: 0,
+    generate: 0,
+  };
+  private readonly latencyWindowByEndpoint: Record<AiEndpoint, number[]> = {
+    summarize: [],
+    translate: [],
+    analyze: [],
+    generate: [],
+  };
+  private readonly recentRequests: RequestLogEntry[] = [];
+  private readonly LATENCY_WINDOW_SIZE = 100;
+  private readonly RECENT_REQUESTS_LIMIT = 20;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -87,6 +105,7 @@ export class AiService {
     maxLength: SummaryLength = SummaryLength.MEDIUM,
   ): Promise<SummarizeArticleResponseDto> {
     const startedAt = this.markRequestStarted('summarize');
+    let succeeded = false;
     try {
       const article = await this.getArticleOrFail(articleId);
       const cacheKey = this.buildSummarizeCacheKey(
@@ -97,6 +116,7 @@ export class AiService {
       const cached = this.getCachedValue(this.summarizeCache, cacheKey);
       if (cached) {
         this.cacheByEndpoint.summarize.hits += 1;
+        succeeded = true;
         return cached;
       }
       this.cacheByEndpoint.summarize.misses += 1;
@@ -117,9 +137,10 @@ export class AiService {
       };
 
       this.setCachedValue(this.summarizeCache, cacheKey, response);
+      succeeded = true;
       return response;
     } finally {
-      this.markRequestFinished('summarize', startedAt);
+      this.markRequestFinished('summarize', startedAt, succeeded);
     }
   }
 
@@ -129,6 +150,7 @@ export class AiService {
     sourceLanguage?: string,
   ): Promise<TranslateArticleResponseDto> {
     const startedAt = this.markRequestStarted('translate');
+    let succeeded = false;
     try {
       const article = await this.getArticleOrFail(articleId);
       const cacheKey = this.buildTranslateCacheKey(
@@ -140,6 +162,7 @@ export class AiService {
       const cached = this.getCachedValue(this.translateCache, cacheKey);
       if (cached) {
         this.cacheByEndpoint.translate.hits += 1;
+        succeeded = true;
         return cached;
       }
       this.cacheByEndpoint.translate.misses += 1;
@@ -152,16 +175,20 @@ export class AiService {
       const generation = await this.geminiService.generateTextWithMeta(prompt);
       const generatedText = generation.text;
       this.recordTokenUsage(generation.usageMetadata);
-      const parsedPayload =
-        this.parseJsonPayload<TranslatePayload>(generatedText);
 
-      if (parsedPayload?.translatedText && parsedPayload?.detectedLanguage) {
+      const validated = this.validateStructuredPayload(
+        generatedText,
+        TranslatePayloadDto,
+      );
+
+      if (validated) {
         const response: TranslateArticleResponseDto = {
           articleId: article.id,
-          translatedText: parsedPayload.translatedText,
-          detectedLanguage: parsedPayload.detectedLanguage,
+          translatedText: validated.translatedText,
+          detectedLanguage: validated.detectedLanguage,
         };
         this.setCachedValue(this.translateCache, cacheKey, response);
+        succeeded = true;
         return response;
       }
 
@@ -172,9 +199,10 @@ export class AiService {
       };
 
       this.setCachedValue(this.translateCache, cacheKey, fallbackResponse);
+      succeeded = true;
       return fallbackResponse;
     } finally {
-      this.markRequestFinished('translate', startedAt);
+      this.markRequestFinished('translate', startedAt, succeeded);
     }
   }
 
@@ -183,6 +211,7 @@ export class AiService {
     task: AnalyzeTask = AnalyzeTask.REVIEW,
   ): Promise<AnalyzeArticleResponseDto> {
     const startedAt = this.markRequestStarted('analyze');
+    let succeeded = false;
     try {
       const article = await this.getArticleOrFail(articleId);
       const prompt = this.promptsService.buildAnalyzePrompt(
@@ -192,19 +221,20 @@ export class AiService {
       const generation = await this.geminiService.generateTextWithMeta(prompt);
       const generatedText = generation.text;
       this.recordTokenUsage(generation.usageMetadata);
-      const parsedPayload =
-        this.parseJsonPayload<AnalyzePayload>(generatedText);
 
-      if (
-        parsedPayload?.analysis &&
-        Array.isArray(parsedPayload.suggestions) &&
-        this.isSeverity(parsedPayload.severity)
-      ) {
+      const validated = this.validateStructuredPayload(
+        generatedText,
+        AnalyzePayloadDto,
+      );
+
+      succeeded = true;
+
+      if (validated) {
         return {
           articleId: article.id,
-          analysis: parsedPayload.analysis,
-          suggestions: parsedPayload.suggestions,
-          severity: parsedPayload.severity,
+          analysis: validated.analysis,
+          suggestions: validated.suggestions,
+          severity: validated.severity,
         };
       }
 
@@ -215,18 +245,20 @@ export class AiService {
         severity: 'info',
       };
     } finally {
-      this.markRequestFinished('analyze', startedAt);
+      this.markRequestFinished('analyze', startedAt, succeeded);
     }
   }
 
   async generate(prompt: string): Promise<string> {
     const startedAt = this.markRequestStarted('generate');
+    let succeeded = false;
     try {
       const generation = await this.geminiService.generateTextWithMeta(prompt);
       this.recordTokenUsage(generation.usageMetadata);
+      succeeded = true;
       return generation.text;
     } finally {
-      this.markRequestFinished('generate', startedAt);
+      this.markRequestFinished('generate', startedAt, succeeded);
     }
   }
 
@@ -239,11 +271,23 @@ export class AiService {
         analyze: this.requestsByEndpoint.analyze,
         generate: this.requestsByEndpoint.generate,
       },
+      errorsByEndpoint: {
+        summarize: this.errorsByEndpoint.summarize,
+        translate: this.errorsByEndpoint.translate,
+        analyze: this.errorsByEndpoint.analyze,
+        generate: this.errorsByEndpoint.generate,
+      },
       latencyByEndpoint: {
         summarize: this.toLatencyResponse(this.latencyByEndpoint.summarize),
         translate: this.toLatencyResponse(this.latencyByEndpoint.translate),
         analyze: this.toLatencyResponse(this.latencyByEndpoint.analyze),
         generate: this.toLatencyResponse(this.latencyByEndpoint.generate),
+      },
+      p95LatencyByEndpoint: {
+        summarize: this.computeP95(this.latencyWindowByEndpoint.summarize),
+        translate: this.computeP95(this.latencyWindowByEndpoint.translate),
+        analyze: this.computeP95(this.latencyWindowByEndpoint.analyze),
+        generate: this.computeP95(this.latencyWindowByEndpoint.generate),
       },
       cacheByEndpoint: {
         summarize: this.toCacheResponse(this.cacheByEndpoint.summarize),
@@ -254,6 +298,8 @@ export class AiService {
         candidatesTokenCount: this.tokenUsage.candidatesTokenCount,
         totalTokenCount: this.tokenUsage.totalTokenCount,
       },
+      recentRequests: [...this.recentRequests],
+      uptimeMs: Date.now() - this.serviceStartedAt,
     };
   }
 
@@ -291,6 +337,24 @@ export class AiService {
     } catch {
       return null;
     }
+  }
+
+  private computeP95(window: number[]): number {
+    if (window.length === 0) return 0;
+    const sorted = [...window].sort((a, b) => a - b);
+    const idx = Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1);
+    return Number((sorted[idx] ?? 0).toFixed(2));
+  }
+
+  private validateStructuredPayload<T extends object>(
+    rawText: string,
+    cls: new () => T,
+  ): T | null {
+    const plain = this.parseJsonPayload<Record<string, unknown>>(rawText);
+    if (!plain || typeof plain !== 'object') return null;
+    const instance = plainToInstance(cls, plain);
+    const errors = validateSync(instance as object);
+    return errors.length === 0 ? instance : null;
   }
 
   private isSeverity(value: unknown): value is 'info' | 'warning' | 'error' {
@@ -368,12 +432,37 @@ export class AiService {
     return Date.now();
   }
 
-  private markRequestFinished(endpoint: AiEndpoint, startedAt: number): void {
+  private markRequestFinished(
+    endpoint: AiEndpoint,
+    startedAt: number,
+    succeeded = true,
+  ): void {
     const elapsedMs = Date.now() - startedAt;
     const stats = this.latencyByEndpoint[endpoint];
     stats.count += 1;
     stats.totalMs += elapsedMs;
     stats.lastMs = elapsedMs;
+
+    const window = this.latencyWindowByEndpoint[endpoint];
+    window.push(elapsedMs);
+    if (window.length > this.LATENCY_WINDOW_SIZE) {
+      window.shift();
+    }
+
+    if (!succeeded) {
+      this.errorsByEndpoint[endpoint] += 1;
+    }
+
+    const entry: RequestLogEntry = {
+      timestamp: Date.now(),
+      endpoint,
+      durationMs: elapsedMs,
+      success: succeeded,
+    };
+    this.recentRequests.push(entry);
+    if (this.recentRequests.length > this.RECENT_REQUESTS_LIMIT) {
+      this.recentRequests.shift();
+    }
   }
 
   private toLatencyResponse(stats: LatencyStats): {
