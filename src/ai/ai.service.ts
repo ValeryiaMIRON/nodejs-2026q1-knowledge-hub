@@ -21,8 +21,22 @@ type TranslatePayload = {
   detectedLanguage: string;
 };
 
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
 @Injectable()
 export class AiService {
+  private readonly summarizeCache = new Map<
+    string,
+    CacheEntry<SummarizeArticleResponseDto>
+  >();
+  private readonly translateCache = new Map<
+    string,
+    CacheEntry<TranslateArticleResponseDto>
+  >();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
@@ -34,18 +48,31 @@ export class AiService {
     maxLength: SummaryLength = SummaryLength.MEDIUM,
   ): Promise<SummarizeArticleResponseDto> {
     const article = await this.getArticleOrFail(articleId);
+    const cacheKey = this.buildSummarizeCacheKey(
+      article.id,
+      maxLength,
+      article.updatedAt,
+    );
+    const cached = this.getCachedValue(this.summarizeCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const prompt = this.promptsService.buildSummarizePrompt(
       article.content,
       maxLength,
     );
     const summary = await this.geminiService.generateText(prompt);
 
-    return {
+    const response: SummarizeArticleResponseDto = {
       articleId: article.id,
       summary,
       originalLength: article.content.length,
       summaryLength: summary.length,
     };
+
+    this.setCachedValue(this.summarizeCache, cacheKey, response);
+    return response;
   }
 
   async translateArticle(
@@ -54,6 +81,17 @@ export class AiService {
     sourceLanguage?: string,
   ): Promise<TranslateArticleResponseDto> {
     const article = await this.getArticleOrFail(articleId);
+    const cacheKey = this.buildTranslateCacheKey(
+      article.id,
+      targetLanguage,
+      sourceLanguage,
+      article.updatedAt,
+    );
+    const cached = this.getCachedValue(this.translateCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const prompt = this.promptsService.buildTranslatePrompt(
       article.content,
       targetLanguage,
@@ -64,18 +102,23 @@ export class AiService {
       this.parseJsonPayload<TranslatePayload>(generatedText);
 
     if (parsedPayload?.translatedText && parsedPayload?.detectedLanguage) {
-      return {
+      const response: TranslateArticleResponseDto = {
         articleId: article.id,
         translatedText: parsedPayload.translatedText,
         detectedLanguage: parsedPayload.detectedLanguage,
       };
+      this.setCachedValue(this.translateCache, cacheKey, response);
+      return response;
     }
 
-    return {
+    const fallbackResponse: TranslateArticleResponseDto = {
       articleId: article.id,
       translatedText: generatedText,
       detectedLanguage: sourceLanguage || 'unknown',
     };
+
+    this.setCachedValue(this.translateCache, cacheKey, fallbackResponse);
+    return fallbackResponse;
   }
 
   async analyzeArticle(
@@ -118,12 +161,14 @@ export class AiService {
   private async getArticleOrFail(articleId: string): Promise<{
     id: string;
     content: string;
+    updatedAt: Date;
   }> {
     const article = await this.prisma.article.findUnique({
       where: { id: articleId },
       select: {
         id: true,
         content: true,
+        updatedAt: true,
       },
     });
 
@@ -151,5 +196,70 @@ export class AiService {
 
   private isSeverity(value: unknown): value is 'info' | 'warning' | 'error' {
     return value === 'info' || value === 'warning' || value === 'error';
+  }
+
+  private getCacheTtlMs(): number {
+    const ttlSec = Number(process.env.AI_CACHE_TTL_SEC || '300');
+    if (Number.isNaN(ttlSec) || ttlSec <= 0) {
+      return 300_000;
+    }
+
+    return ttlSec * 1000;
+  }
+
+  private buildSummarizeCacheKey(
+    articleId: string,
+    maxLength: SummaryLength,
+    updatedAt: Date,
+  ): string {
+    return `summarize:${articleId}:${maxLength}:${updatedAt.toISOString()}`;
+  }
+
+  private buildTranslateCacheKey(
+    articleId: string,
+    targetLanguage: string,
+    sourceLanguage: string | undefined,
+    updatedAt: Date,
+  ): string {
+    const source = sourceLanguage || 'auto';
+    return `translate:${articleId}:${targetLanguage}:${source}:${updatedAt.toISOString()}`;
+  }
+
+  private getCachedValue<T>(
+    cache: Map<string, CacheEntry<T>>,
+    key: string,
+  ): T | null {
+    const existing = cache.get(key);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.expiresAt <= Date.now()) {
+      cache.delete(key);
+      return null;
+    }
+
+    return existing.value;
+  }
+
+  private setCachedValue<T>(
+    cache: Map<string, CacheEntry<T>>,
+    key: string,
+    value: T,
+  ): void {
+    this.pruneExpiredEntries(cache);
+    cache.set(key, {
+      value,
+      expiresAt: Date.now() + this.getCacheTtlMs(),
+    });
+  }
+
+  private pruneExpiredEntries<T>(cache: Map<string, CacheEntry<T>>): void {
+    const now = Date.now();
+    for (const [key, entry] of cache.entries()) {
+      if (entry.expiresAt <= now) {
+        cache.delete(key);
+      }
+    }
   }
 }
