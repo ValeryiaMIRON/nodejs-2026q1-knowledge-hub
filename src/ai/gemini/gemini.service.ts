@@ -4,7 +4,10 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { GeminiGenerateContentResponse } from './gemini.types';
+import {
+  GeminiGenerateContentResponse,
+  GeminiGenerateTextResult,
+} from './gemini.types';
 
 @Injectable()
 export class GeminiService {
@@ -17,10 +20,13 @@ export class GeminiService {
   private readonly timeoutMs = 15000;
 
   async generateText(prompt: string): Promise<string> {
+    const result = await this.generateTextWithMeta(prompt);
+    return result.text;
+  }
+
+  async generateTextWithMeta(prompt: string): Promise<GeminiGenerateTextResult> {
     if (!this.apiKey) {
-      throw new InternalServerErrorException(
-        'Gemini API key is not configured',
-      );
+      throw new InternalServerErrorException('Gemini API key is not configured');
     }
 
     const url = this.buildGenerateContentUrl();
@@ -39,9 +45,7 @@ export class GeminiService {
       });
 
       if (!response.ok) {
-        this.logger.error(
-          `Gemini request failed with status ${response.status}`,
-        );
+        this.logger.error(`Gemini request failed with status ${response.status}`);
         throw new ServiceUnavailableException(
           'AI service is temporarily unavailable',
         );
@@ -56,7 +60,10 @@ export class GeminiService {
         );
       }
 
-      return generatedText;
+      return {
+        text: generatedText,
+        usageMetadata: payload.usageMetadata,
+      };
     } catch (error: unknown) {
       if (
         error instanceof ServiceUnavailableException ||
@@ -69,9 +76,7 @@ export class GeminiService {
         'Gemini request failed due to network or timeout error',
         error instanceof Error ? error.stack : undefined,
       );
-      throw new ServiceUnavailableException(
-        'AI service is temporarily unavailable',
-      );
+      throw new ServiceUnavailableException('AI service is temporarily unavailable');
     }
   }
 

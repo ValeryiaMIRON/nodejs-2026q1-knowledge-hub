@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { AiRateLimitGuard } from './ai-rate-limit.guard';
@@ -8,6 +8,7 @@ import {
   SummarizeArticleResponseDto,
   TranslateArticleResponseDto,
 } from './dto/ai-response.dto';
+import { AiUsageResponseDto } from './dto/ai-usage-response.dto';
 import { ArticleIdParamDto } from './dto/article-id-param.dto';
 import { SummarizeArticleDto } from './dto/summarize-article.dto';
 import { TranslateArticleDto } from './dto/translate-article.dto';
@@ -17,6 +18,18 @@ import { TranslateArticleDto } from './dto/translate-article.dto';
 @UseGuards(AiRateLimitGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
+
+  @Get('usage')
+  @ApiOperation({ summary: 'Get AI usage statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage stats',
+    type: AiUsageResponseDto,
+  })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
+  getUsage(): AiUsageResponseDto {
+    return this.aiService.getUsageStats();
+  }
 
   @Post('articles/:articleId/summarize')
   @ApiOperation({ summary: 'Generate article summary' })

@@ -12,3 +12,12 @@ export interface GeminiGenerateContentResponse {
     totalTokenCount?: number;
   };
 }
+
+export interface GeminiGenerateTextResult {
+  text: string;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
