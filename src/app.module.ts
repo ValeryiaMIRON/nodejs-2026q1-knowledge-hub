@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RolesGuard } from './auth/roles.guard';
     CategoryModule,
     CommentModule,
     PrismaModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

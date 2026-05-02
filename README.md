@@ -92,11 +92,16 @@ Main variables:
 
 - PORT
 - CRYPT_SALT
-- JWT_SECRET_KEY
-- JWT_SECRET_REFRESH_KEY
-- TOKEN_EXPIRE_TIME
-- TOKEN_REFRESH_EXPIRE_TIME
+- JWT_SECRET
+- JWT_REFRESH_SECRET
+- JWT_ACCESS_TTL
+- JWT_REFRESH_TTL
 - DATABASE_URL
+- GEMINI_API_KEY
+- GEMINI_API_BASE_URL
+- GEMINI_MODEL
+- AI_RATE_LIMIT_RPM
+- AI_CACHE_TTL_SEC
 
 DATABASE_URL examples:
 
@@ -106,6 +111,169 @@ DATABASE_URL examples:
 Note:
 
 - docker-compose sets DATABASE_URL for app service to use db hostname.
+
+## Gemini API Key Setup (Step-by-step)
+
+1. Open Google AI Studio: https://aistudio.google.com
+2. Sign in with your Google account.
+3. Open API keys page and create a new key.
+4. Copy generated key.
+5. Open local `.env` file (created from `.env.example`).
+6. Paste the key into:
+
+```dotenv
+GEMINI_API_KEY=your-real-key
+```
+
+7. Keep this key private and never commit `.env`.
+
+## Gemini Model Used
+
+The service uses Gemini model from env variable:
+
+```dotenv
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+Default base URL:
+
+```dotenv
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
+```
+
+## Run After Clone (Exact Steps)
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create environment file:
+
+```bash
+cp .env.example .env
+```
+
+3. Fill required `.env` values:
+
+```dotenv
+PORT=4000
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/knowledge_hub?schema=public&connection_limit=5
+JWT_SECRET=your_access_token_secret
+JWT_REFRESH_SECRET=your_refresh_token_secret
+GEMINI_API_KEY=your-real-key
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
+GEMINI_MODEL=gemini-2.0-flash
+AI_RATE_LIMIT_RPM=20
+AI_CACHE_TTL_SEC=300
+```
+
+4. Run DB migrations and (optionally) seed:
+
+```bash
+npx prisma migrate deploy
+npm run prisma:seed
+```
+
+If `npm run prisma:seed` is unavailable in your local setup, use:
+
+```bash
+npx prisma db seed
+```
+
+5. Start API:
+
+```bash
+npm run start:dev
+```
+
+6. Open Swagger docs:
+
+```text
+http://localhost:4000/doc
+```
+
+## AI Endpoints
+
+- POST /ai/articles/:articleId/summarize
+- POST /ai/articles/:articleId/translate
+- POST /ai/articles/:articleId/analyze
+- POST /ai/generate
+- GET /ai/usage
+- POST /ai/conversations
+- POST /ai/conversations/:conversationId/messages
+
+Example requests:
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-id>/summarize" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"maxLength":"medium"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-id>/translate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"targetLanguage":"Spanish"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-id>/analyze" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"task":"review"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/generate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"prompt":"Explain NestJS in one short paragraph"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/conversations" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"message":"What is NestJS?"}'
+```
+
+```bash
+curl -X POST "http://localhost:4000/ai/conversations/<conversationId>/messages" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"message":"Can you give a code example?"}'
+```
+
+## Validate Gemini Key Before App Run
+
+Use this direct provider check to verify that your key and quota are valid.
+
+```bash
+curl -s -o /tmp/gemini_check.json -w "%{http_code}\n" \
+  -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=<YOUR_GEMINI_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hello in one short sentence"}]}]}'
+
+cat /tmp/gemini_check.json
+```
+
+Expected statuses:
+
+- 200: key and provider access are valid.
+- 401: invalid API key.
+- 403: project/API permission issue or regional restriction.
+- 429: quota exhausted or free-tier quota unavailable.
+
+## Known Limitations
+
+- Gemini free tier has request and token quotas; calls may fail with provider rate limits.
+- Latency can vary depending on model load and network quality.
+- Regional availability and policy restrictions may differ by account/location.
+- AI outputs are probabilistic and can be inconsistent; production flows should validate response format.
 
 ## API Routes
 
