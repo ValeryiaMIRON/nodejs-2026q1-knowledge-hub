@@ -10,6 +10,7 @@ import {
 } from './dto/ai-response.dto';
 import { AiUsageResponseDto } from './dto/ai-usage-response.dto';
 import { ArticleIdParamDto } from './dto/article-id-param.dto';
+import { GenerateDto } from './dto/generate.dto';
 import { SummarizeArticleDto } from './dto/summarize-article.dto';
 import { TranslateArticleDto } from './dto/translate-article.dto';
 
@@ -84,5 +85,19 @@ export class AiController {
     @Body() body: AnalyzeArticleDto,
   ): Promise<AnalyzeArticleResponseDto> {
     return this.aiService.analyzeArticle(params.articleId, body.task);
+  }
+
+  @Post('generate')
+  @ApiOperation({ summary: 'Generate text from a free-form prompt (Gemini)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Generated text',
+    schema: { properties: { text: { type: 'string' } } },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request body' })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
+  async generate(@Body() body: GenerateDto): Promise<{ text: string }> {
+    const text = await this.aiService.generate(body.prompt);
+    return { text };
   }
 }
