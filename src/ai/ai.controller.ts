@@ -1,6 +1,7 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AiService } from './ai.service';
+import { AiRateLimitGuard } from './ai-rate-limit.guard';
 import { AnalyzeArticleDto } from './dto/analyze-article.dto';
 import {
   AnalyzeArticleResponseDto,
@@ -13,6 +14,7 @@ import { TranslateArticleDto } from './dto/translate-article.dto';
 
 @ApiTags('AI')
 @Controller('ai')
+@UseGuards(AiRateLimitGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
@@ -25,6 +27,7 @@ export class AiController {
   })
   @ApiResponse({ status: 400, description: 'Invalid request body or UUID' })
   @ApiResponse({ status: 404, description: 'Article not found' })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
   summarizeArticle(
     @Param() params: ArticleIdParamDto,
     @Body() body: SummarizeArticleDto,
@@ -41,6 +44,7 @@ export class AiController {
   })
   @ApiResponse({ status: 400, description: 'Invalid request body or UUID' })
   @ApiResponse({ status: 404, description: 'Article not found' })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
   translateArticle(
     @Param() params: ArticleIdParamDto,
     @Body() body: TranslateArticleDto,
@@ -61,6 +65,7 @@ export class AiController {
   })
   @ApiResponse({ status: 400, description: 'Invalid request body or UUID' })
   @ApiResponse({ status: 404, description: 'Article not found' })
+  @ApiResponse({ status: 429, description: 'AI rate limit exceeded' })
   analyzeArticle(
     @Param() params: ArticleIdParamDto,
     @Body() body: AnalyzeArticleDto,
