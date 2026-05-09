@@ -121,6 +121,40 @@ export class RagVectorDbService {
     return deleted;
   }
 
+  async getIndexedArticleUpdatedAtMap(): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    let offset: string | number | null | undefined = null;
+
+    do {
+      const response = (await this.callQdrant(
+        `/collections/${encodeURIComponent(this.collectionName)}/points/scroll`,
+        'POST',
+        {
+          limit: 100,
+          with_payload: true,
+          with_vector: false,
+          ...(offset !== null ? { offset } : {}),
+        },
+      )) as QdrantScrollResponse;
+
+      for (const point of response.result?.points ?? []) {
+        const articleId = point.payload?.articleId;
+        const updatedAt = point.payload?.updatedAt;
+        if (!articleId || !updatedAt) {
+          continue;
+        }
+        const known = result.get(articleId);
+        if (!known || updatedAt > known) {
+          result.set(articleId, updatedAt);
+        }
+      }
+
+      offset = response.result?.next_page_offset ?? null;
+    } while (offset !== null);
+
+    return result;
+  }
+
   async search(
     vector: number[],
     limit: number,

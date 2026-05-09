@@ -18,6 +18,15 @@ export class RagIndexRequestDto {
   @IsArray()
   @IsUUID('4', { each: true })
   articleIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Incremental mode: index only changed articles for non-selective reindex',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  incremental?: boolean;
 }
 
 export class RagIndexResponseDto {

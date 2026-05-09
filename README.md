@@ -32,6 +32,7 @@ GEMINI_EMBEDDING_MODEL=text-embedding-004
 RAG_VECTOR_DB_PROVIDER=qdrant
 RAG_VECTOR_DB_URL=http://vectordb:6333
 RAG_VECTOR_COLLECTION=knowledge_hub_articles
+RAG_INDEX_INCREMENTAL=true
 RAG_CHUNK_SIZE=800
 RAG_CHUNK_OVERLAP=200
 RAG_CONVERSATION_MAX_MESSAGES=20
@@ -175,6 +176,12 @@ curl -X DELETE "http://localhost:4000/ai/rag/index/articles/<article-id>" \
 - If Qdrant is unavailable, API returns `503`.
 - Integration errors are logged without leaking secrets.
 - Reindex removes stale article vectors during full rebuild.
+
+## Hacker-level retrieval/indexing extras
+
+- Hybrid retrieval: combines semantic vector search and lexical DB search.
+- Secondary reranking: re-scores merged candidates by lexical relevance.
+- Incremental indexing: when enabled, non-selective reindex updates only changed articles and keeps idempotent behavior.
 
 ## Known limitations
 
