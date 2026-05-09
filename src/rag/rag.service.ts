@@ -99,6 +99,12 @@ export class RagService {
         indexedChunks += points.length;
       }
 
+      if (!request.articleIds?.length) {
+        await this.vectorDbService.deleteArticlesNotInSet(
+          new Set(articles.map((article) => article.id)),
+        );
+      }
+
       return {
         indexedArticles,
         indexedChunks,

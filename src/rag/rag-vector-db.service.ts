@@ -18,7 +18,9 @@ type QdrantScrollResponse = {
   result?: {
     points?: Array<{
       id: string | number;
+      payload?: RagVectorPayload;
     }>;
+    next_page_offset?: string | number | null;
   };
 };
 
@@ -102,6 +104,21 @@ export class RagVectorDbService {
     )) as QdrantScrollResponse;
 
     return Boolean(response.result?.points?.length);
+  }
+
+  async deleteArticlesNotInSet(allowedArticleIds: Set<string>): Promise<number> {
+    const indexedIds = await this.listIndexedArticleIds();
+    let deleted = 0;
+
+    for (const articleId of indexedIds) {
+      if (allowedArticleIds.has(articleId)) {
+        continue;
+      }
+      await this.deleteByArticleId(articleId);
+      deleted += 1;
+    }
+
+    return deleted;
   }
 
   async search(
@@ -222,5 +239,33 @@ export class RagVectorDbService {
         'Vector DB is temporarily unavailable',
       );
     }
+  }
+
+  private async listIndexedArticleIds(): Promise<Set<string>> {
+    const ids = new Set<string>();
+    let offset: string | number | null | undefined = null;
+
+    do {
+      const response = (await this.callQdrant(
+        `/collections/${encodeURIComponent(this.collectionName)}/points/scroll`,
+        'POST',
+        {
+          limit: 100,
+          with_payload: true,
+          with_vector: false,
+          ...(offset !== null ? { offset } : {}),
+        },
+      )) as QdrantScrollResponse;
+
+      for (const point of response.result?.points ?? []) {
+        if (point.payload?.articleId) {
+          ids.add(point.payload.articleId);
+        }
+      }
+
+      offset = response.result?.next_page_offset ?? null;
+    } while (offset !== null);
+
+    return ids;
   }
 }
