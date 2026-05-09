@@ -14,6 +14,14 @@ type QdrantSearchResponse = {
   }>;
 };
 
+type QdrantScrollResponse = {
+  result?: {
+    points?: Array<{
+      id: string | number;
+    }>;
+  };
+};
+
 class QdrantHttpError extends Error {
   constructor(public readonly statusCode: number, message: string) {
     super(message);
@@ -77,6 +85,23 @@ export class RagVectorDbService {
     );
 
     return Boolean(response?.result);
+  }
+
+  async hasVectorsForArticle(articleId: string): Promise<boolean> {
+    const response = (await this.callQdrant(
+      `/collections/${encodeURIComponent(this.collectionName)}/points/scroll`,
+      'POST',
+      {
+        filter: {
+          must: [{ key: 'articleId', match: { value: articleId } }],
+        },
+        limit: 1,
+        with_payload: false,
+        with_vector: false,
+      },
+    )) as QdrantScrollResponse;
+
+    return Boolean(response.result?.points?.length);
   }
 
   async search(

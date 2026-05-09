@@ -1,5 +1,22 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  RagChatRequestDto,
+  RagChatResponseDto,
+  RagConversationHistoryResponseDto,
+} from './dto/rag-chat.dto';
+import {
+  RagArticleParamDto,
+  RagConversationParamDto,
+} from './dto/rag-article-param.dto';
 import { RagIndexRequestDto, RagIndexResponseDto } from './dto/rag-index.dto';
 import { RagSearchRequestDto, RagSearchResponseDto } from './dto/rag-search.dto';
 import { RagService } from './rag.service';
@@ -26,5 +43,34 @@ export class RagController {
   @ApiResponse({ status: 400, description: 'query is required' })
   search(@Body() body: RagSearchRequestDto): Promise<RagSearchResponseDto> {
     return this.ragService.search(body);
+  }
+
+  @Post('chat')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Ask a grounded question using RAG context' })
+  @ApiResponse({ status: 200, type: RagChatResponseDto })
+  @ApiResponse({ status: 400, description: 'question is required' })
+  chat(@Body() body: RagChatRequestDto): Promise<RagChatResponseDto> {
+    return this.ragService.chat(body);
+  }
+
+  @Delete('index/articles/:articleId')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete all indexed chunks for an article' })
+  @ApiResponse({ status: 204, description: 'Article vectors deleted' })
+  @ApiResponse({ status: 404, description: 'Article vectors not found' })
+  async removeArticleFromIndex(@Param() params: RagArticleParamDto): Promise<void> {
+    await this.ragService.removeArticleFromIndex(params.articleId);
+  }
+
+  @Get('chat/:conversationId/history')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get RAG conversation history by conversation ID' })
+  @ApiResponse({ status: 200, type: RagConversationHistoryResponseDto })
+  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  getConversationHistory(
+    @Param() params: RagConversationParamDto,
+  ): RagConversationHistoryResponseDto {
+    return this.ragService.getConversationHistory(params.conversationId);
   }
 }
