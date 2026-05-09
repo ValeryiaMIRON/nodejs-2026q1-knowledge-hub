@@ -26,3 +26,9 @@ export interface GeminiGenerateTextResult {
     totalTokenCount?: number;
   };
 }
+
+export interface GeminiEmbeddingResponse {
+  embedding?: {
+    values?: number[];
+  };
+}
