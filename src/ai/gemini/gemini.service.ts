@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   GeminiContent,
+  GeminiEmbeddingResponse,
   GeminiGenerateContentResponse,
   GeminiGenerateTextResult,
 } from './gemini.types';
@@ -18,6 +19,8 @@ export class GeminiService {
     process.env.GEMINI_API_BASE_URL ||
     'https://generativelanguage.googleapis.com';
   private readonly model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  private readonly embeddingModel =
+    process.env.GEMINI_EMBEDDING_MODEL || 'text-embedding-004';
   private readonly timeoutMs = 15000;
   private readonly maxRetries = 3;
   private readonly initialRetryDelayMs = 200;
@@ -37,6 +40,122 @@ export class GeminiService {
     contents: GeminiContent[],
   ): Promise<GeminiGenerateTextResult> {
     return this.generateContents(contents);
+  }
+
+  async embedText(text: string): Promise<number[]> {
+    if (!this.apiKey) {
+      throw new InternalServerErrorException(
+        'Gemini API key is not configured',
+      );
+    }
+
+    const trimmedText = text.trim();
+    if (!trimmedText) {
+      throw new InternalServerErrorException('Cannot embed empty text');
+    }
+
+    const url = this.buildEmbedContentUrl();
+    const body = {
+      model: `models/${this.embeddingModel}`,
+      content: {
+        parts: [{ text: trimmedText }],
+      },
+    };
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          this.logger.error(
+            `Gemini authentication failed with status ${response.status}`,
+          );
+          throw new InternalServerErrorException(
+            'AI provider authentication failed',
+          );
+        }
+
+        if (this.isRetryableStatus(response.status)) {
+          lastError = new ServiceUnavailableException(
+            'AI provider temporarily unavailable',
+          );
+          if (attempt < this.maxRetries) {
+            await this.delay(this.getRetryDelayMs(attempt));
+            continue;
+          }
+          break;
+        }
+
+        if (!response.ok) {
+          this.logger.error(
+            `Gemini embedding request failed with status ${response.status}`,
+          );
+          throw new ServiceUnavailableException(
+            'AI service is temporarily unavailable',
+          );
+        }
+
+        const payload = (await response.json()) as GeminiEmbeddingResponse;
+        const vector = payload.embedding?.values;
+        if (!vector?.length) {
+          throw new ServiceUnavailableException(
+            'AI embedding service returned empty vector',
+          );
+        }
+
+        return vector;
+      } catch (error: unknown) {
+        if (error instanceof InternalServerErrorException) {
+          throw error;
+        }
+
+        if (this.isNetworkOrTimeoutError(error)) {
+          this.logger.error(
+            'Gemini embedding request failed due to network or timeout error',
+            error instanceof Error ? error.stack : undefined,
+          );
+
+          if (attempt < this.maxRetries) {
+            await this.delay(this.getRetryDelayMs(attempt));
+            continue;
+          }
+
+          throw new ServiceUnavailableException(
+            'AI service is temporarily unavailable',
+          );
+        }
+
+        if (error instanceof ServiceUnavailableException) {
+          if (attempt < this.maxRetries) {
+            await this.delay(this.getRetryDelayMs(attempt));
+            continue;
+          }
+          throw error;
+        }
+
+        this.logger.error(
+          'Unexpected Gemini embedding integration error',
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new ServiceUnavailableException(
+          'AI service is temporarily unavailable',
+        );
+      }
+    }
+
+    this.logger.error(
+      'Gemini embedding request failed after retries',
+      lastError instanceof Error ? lastError.stack : undefined,
+    );
+    throw new ServiceUnavailableException('AI service is temporarily unavailable');
   }
 
   private async generateContents(
@@ -162,6 +281,13 @@ export class GeminiService {
     const encodedKey = encodeURIComponent(this.apiKey);
 
     return `${trimmedBaseUrl}/v1beta/models/${encodedModel}:generateContent?key=${encodedKey}`;
+  }
+
+  private buildEmbedContentUrl(): string {
+    const trimmedBaseUrl = this.baseUrl.replace(/\/+$/, '');
+    const encodedModel = encodeURIComponent(this.embeddingModel);
+    const encodedKey = encodeURIComponent(this.apiKey);
+    return `${trimmedBaseUrl}/v1beta/models/${encodedModel}:embedContent?key=${encodedKey}`;
   }
 
   private extractText(payload: GeminiGenerateContentResponse): string {
